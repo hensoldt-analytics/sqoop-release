@@ -848,7 +848,7 @@
     <echo message="Release audit report: ${build.dir}/rat.log" />
   </target>
 
-  <target name="mvn-prep" depends="init,ivy-resolve-test">
+  <target name="mvn-prep" depends="init,ivy-resolve-test" unless="mvn-prep.called">
     <!-- prepare for mvn tasks. -->
 
     <!-- Download maven -->
@@ -882,6 +882,7 @@
         <include name="*.pom" />
       </fileset>
     </replaceregexp>
+    <property name="mvn-prep.called" value="true" />
   </target>
 
   <target name="srcjars" depends="init,jar-all"
