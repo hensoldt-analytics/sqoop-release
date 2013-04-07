@@ -22,9 +22,9 @@ BUILD_DIR=$(BUILDROOT)/docs
 
 VERSION=Unknown
 
-# Building documentation under CentOS causes xmlto to have issues
-# with validation. Disable this step.
-VALIDATION=$(shell ( lsb_release -d | grep CentOS > /dev/null 2>&1 ) \
+# Building documentation under CentOS or Red Hat 5.8 causes xmlto to 
+# have issues with validation. Disable this step.
+VALIDATION=$(shell ( lsb_release -d | grep -e 'CentOS\|5.8' > /dev/null 2>&1 ) \
        && echo "--skip-validation" )
 
 all: man userguide devguide supportfiles index

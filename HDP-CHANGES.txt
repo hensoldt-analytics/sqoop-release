@@ -11,4 +11,5 @@ https://git-wip-us.apache.org/repos/asf?p=sqoop.git;a=commit;h=82fde21d0f6c89059
 
 
  BUG FIXES
-   SQOOP-916. Add an abort validation handler 
+   SQOOP-916. Add an abort validation handler
+   SQOOP-798. ant docs doesn't work on RedHat 5.8. 
