@@ -391,6 +391,11 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         .withLongOpt(HADOOP_MAPRED_HOME_ARG)
         .create());
 
+    commonOpts.addOption(OptionBuilder.withArgName("hdir")
+            .hasArg().withDescription("Override $HADOOP_MAPRED_HOME_ARG")
+            .withLongOpt(HADOOP_HOME_ARG)
+            .create());
+
     // misc (common)
     commonOpts.addOption(OptionBuilder
         .withDescription("Print more information while working")
@@ -751,11 +756,12 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       out.setPasswordFromConsole();
     }
 
-    if (in.hasOption(HADOOP_HOME_ARG)) {
-      out.setHadoopMapRedHome(in.getOptionValue(HADOOP_HOME_ARG));
-    }
+
     if (in.hasOption(HADOOP_MAPRED_HOME_ARG)) {
       out.setHadoopMapRedHome(in.getOptionValue(HADOOP_MAPRED_HOME_ARG));
+      // Only consider HADOOP_HOME if HADOOP_MAPRED_HOME is not set
+    } else if (in.hasOption(HADOOP_HOME_ARG)) {
+        out.setHadoopMapRedHome(in.getOptionValue(HADOOP_HOME_ARG));
     }
 
   }

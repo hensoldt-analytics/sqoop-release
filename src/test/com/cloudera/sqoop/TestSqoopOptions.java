@@ -356,5 +356,26 @@ public class TestSqoopOptions extends TestCase {
     assertEquals("connection params don't match",
             connParams, in.getConnectionParams());
   }
+  
+  // test that hadoop-home is accepted as an option
+  public void testHadoopHome() throws Exception {
+    String [] args = {
+      "--hadoop-home",
+      "/usr/lib/hadoop",
+    };
+
+    SqoopOptions opts = parse(args);
+    assertEquals("/usr/lib/hadoop", opts.getHadoopMapRedHome());
+  }
+
+  // test that hadoop-home is accepted as an option
+  public void testHadoopMapRedOverridesHadoopHome() throws Exception {
+	String[] args = { "--hadoop-home", "/usr/lib/hadoop-ignored",
+	  "--hadoop-mapred-home", "/usr/lib/hadoop", };
+
+	SqoopOptions opts = parse(args);
+	assertEquals("/usr/lib/hadoop", opts.getHadoopMapRedHome());
+  }
+
 
 }
