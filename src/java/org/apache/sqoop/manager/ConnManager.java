@@ -164,6 +164,62 @@ public abstract class ConnManager {
     return HiveTypes.toHiveType(sqlType);
   }
 
+   /**
+   * Resolve a database-specific type to HCat data type. Largely follows Sqoop's
+   * hive translation except for float, where we choose float as the type for
+   * HCat
+   *
+   * @param sqlType
+   *          sql type
+   * @return hcat type
+   */
+  public String toHCatType(int sqlType) {
+    switch (sqlType) {
+      case Types.INTEGER:
+      case Types.SMALLINT:
+        return "int";
+
+      case Types.VARCHAR:
+      case Types.CHAR:
+      case Types.LONGVARCHAR:
+      case Types.NVARCHAR:
+      case Types.NCHAR:
+      case Types.LONGNVARCHAR:
+      case Types.DATE:
+      case Types.TIME:
+      case Types.TIMESTAMP:
+      case Types.CLOB:
+        return "string";
+
+      case Types.FLOAT:
+      case Types.REAL:
+        return "float";
+
+      case Types.NUMERIC:
+      case Types.DECIMAL:
+      case Types.DOUBLE:
+        return "double";
+
+      case Types.BIT:
+      case Types.BOOLEAN:
+        return "boolean";
+
+      case Types.TINYINT:
+        return "tinyint";
+
+      case Types.BIGINT:
+        return "bigint";
+
+      case Types.BINARY:
+      case Types.VARBINARY:
+      case Types.BLOB:
+      case Types.LONGVARBINARY:
+        return "binary";
+      default:
+        return null;
+    }
+  }
+
   /**
    * Resolve a database-specific type to Avro data type.
    * @param sqlType     sql type

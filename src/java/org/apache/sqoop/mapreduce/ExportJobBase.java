@@ -36,7 +36,9 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 import org.apache.sqoop.util.PerfCounters;
+
 import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.config.ConfigurationHelper;
 import com.cloudera.sqoop.lib.SqoopRecord;
@@ -79,6 +81,9 @@ public class ExportJobBase extends JobBase {
 
   protected ExportJobContext context;
 
+  protected boolean isHCatJob;
+
+
   public ExportJobBase(final ExportJobContext ctxt) {
     this(ctxt, null, null, null);
   }
@@ -89,6 +94,7 @@ public class ExportJobBase extends JobBase {
       final Class<? extends OutputFormat> outputFormatClass) {
     super(ctxt.getOptions(), mapperClass, inputFormatClass, outputFormatClass);
     this.context = ctxt;
+    this.isHCatJob = options.getHCatTable() != null;
   }
 
   /**
@@ -194,6 +200,9 @@ public class ExportJobBase extends JobBase {
    * @return the Path to the files we are going to export to the db.
    */
   protected Path getInputPath() throws IOException {
+    if (isHCatJob) {
+      return null;
+    }
     Path inputPath = new Path(context.getOptions().getExportDir());
     Configuration conf = options.getConf();
     inputPath = inputPath.makeQualified(FileSystem.get(conf));
@@ -206,7 +215,9 @@ public class ExportJobBase extends JobBase {
       throws ClassNotFoundException, IOException {
 
     super.configureInputFormat(job, tableName, tableClassName, splitByCol);
-    FileInputFormat.addInputPath(job, getInputPath());
+    if (!isHCatJob) {
+      FileInputFormat.addInputPath(job, getInputPath());
+    }
   }
 
   @Override
@@ -364,6 +375,12 @@ public class ExportJobBase extends JobBase {
       }
 
       propagateOptionsToJob(job);
+      if (isHCatJob) {
+        LOG.debug("Configuring HCatalog for export job");
+        SqoopHCatUtilities hCatUtils = SqoopHCatUtilities.instance();
+        hCatUtils.configureHCat(options, job, cmgr, tableName,
+          options.getHCatTable(), job.getConfiguration());
+      }
       configureInputFormat(job, tableName, tableClassName, null);
       configureOutputFormat(job, tableName, tableClassName);
       configureMapper(job, tableName, tableClassName);
@@ -441,6 +458,9 @@ public class ExportJobBase extends JobBase {
   }
 
   protected FileType getInputFileType() {
+    if (isHCatJob) {
+      return FileType.UNKNOWN;
+    }
     try {
       return getFileType(context.getOptions().getConf(), getInputPath());
     } catch (IOException ioe) {

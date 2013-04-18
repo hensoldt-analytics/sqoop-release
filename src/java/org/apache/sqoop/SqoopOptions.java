@@ -144,6 +144,8 @@ public class SqoopOptions implements Cloneable {
   private String hiveDelimsReplacement;
   @StoredAsProperty("hive.partition.key") private String hivePartitionKey;
   @StoredAsProperty("hive.partition.value") private String hivePartitionValue;
+  @StoredAsProperty("hcatalog.table") private String hCatTable;
+  private String hCatHome; // not serialized to metastore.
 
   // User explicit mapping of types
   private Properties mapColumnJava; // stored as map.colum.java
@@ -190,8 +192,8 @@ public class SqoopOptions implements Cloneable {
 
   private DelimiterSet inputDelimiters; // codegen.input.delimiters.
   private DelimiterSet outputDelimiters; // codegen.output.delimiters.
-  private boolean areDelimsManuallySet;
-
+  private boolean areOutputDelimsManuallySet;
+  private boolean areInputDelimsManuallySet;
   private Configuration conf;
 
   public static final int DEFAULT_NUM_MAPPERS = 4;
@@ -575,7 +577,8 @@ public class SqoopOptions implements Cloneable {
 
     // Delimiters were previously memoized; don't let the tool override
     // them with defaults.
-    this.areDelimsManuallySet = true;
+    this.areOutputDelimsManuallySet = true;
+    this.areInputDelimsManuallySet = true;
 
     // If we loaded true verbose flag, we need to apply it
     if (this.verbose) {
@@ -773,12 +776,19 @@ public class SqoopOptions implements Cloneable {
     return System.getProperty("hive.home", hiveHome);
   }
 
+  public static String getHCatHomeDefault() {
+    // Set this with $HCAT_HOME, but -Dhcatalog.home can override.
+    String hiveHome = System.getenv("HCAT_HOME");
+    return System.getProperty("hcat.home", hiveHome);
+  }
+
   private void initDefaults(Configuration baseConfiguration) {
     // first, set the true defaults if nothing else happens.
     // default action is to run the full pipeline.
     this.hadoopMapRedHome = System.getenv("HADOOP_MAPRED_HOME");
 
     this.hiveHome = getHiveHomeDefault();
+    this.hCatHome = getHCatHomeDefault();
 
     this.inputDelimiters = new DelimiterSet(
         DelimiterSet.NULL_CHAR, DelimiterSet.NULL_CHAR,
@@ -800,7 +810,8 @@ public class SqoopOptions implements Cloneable {
     this.jarDirIsAuto = true;
     this.layout = FileLayout.TextFile;
 
-    this.areDelimsManuallySet = false;
+    this.areOutputDelimsManuallySet = false;
+    this.areInputDelimsManuallySet = false;
 
     this.numMappers = DEFAULT_NUM_MAPPERS;
     this.useCompression = false;
@@ -1221,6 +1232,24 @@ public class SqoopOptions implements Cloneable {
     this.failIfHiveTableExists = fail;
   }
 
+  // HCatalog support
+  public void setHCatTable(String ht) {
+    this.hCatTable = ht;
+  }
+
+  public String getHCatTable() {
+    return this.hCatTable;
+  }
+
+  public String getHCatHome() {
+    return hCatHome;
+  }
+
+  public void setHCatHome(String home) {
+    this.hCatHome = home;
+  }
+
+
   /**
    * @return location where .java files go; guaranteed to end with '/'.
    */
@@ -1623,18 +1652,32 @@ public class SqoopOptions implements Cloneable {
     this.fetchSize = size;
   }
 
-  /**
-   * @return true if the delimiters have been explicitly set by the user.
+ /**
+   * @return true if the output delimiters have been explicitly set by the user.
    */
-  public boolean explicitDelims() {
-    return areDelimsManuallySet;
+  public boolean explicitOutputDelims() {
+    return areOutputDelimsManuallySet;
   }
 
   /**
-   * Flag the delimiter settings as explicit user settings, or implicit.
+   * Flag the output delimiter settings as explicit user settings, or implicit.
    */
-  public void setExplicitDelims(boolean explicit) {
-    this.areDelimsManuallySet = explicit;
+  public void setExplicitOutputDelims(boolean explicit) {
+    this.areOutputDelimsManuallySet = explicit;
+  }
+
+  /**
+   * @return true if the input delimiters have been explicitly set by the user.
+   */
+  public boolean explicitInputDelims() {
+    return areInputDelimsManuallySet;
+  }
+
+  /**
+   * Flag the input delimiter settings as explicit user settings, or implicit.
+   */
+  public void setExplicitInputDelims(boolean explicit) {
+    this.areInputDelimsManuallySet = explicit;
   }
 
   public Configuration getConf() {

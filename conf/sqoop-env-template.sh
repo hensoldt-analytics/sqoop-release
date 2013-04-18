@@ -33,3 +33,6 @@
 
 #Set the path for where zookeper config dir is
 #export ZOOCFGDIR=
+
+#Set the path for where bin/hcat is available
+#export HCAT_HOME=

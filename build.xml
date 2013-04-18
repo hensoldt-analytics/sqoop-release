@@ -51,6 +51,7 @@
       <property name="hbase.version" value="0.90.3-cdh3u1" />
       <property name="zookeeper.version" value="3.3.3-cdh3u1" />
       <property name="hadoop.version.full" value="0.20" />
+      <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
     </then>
 
     <elseif>
@@ -60,6 +61,7 @@
         <property name="hbase.version" value="0.92.0" />
         <property name="zookeeper.version" value="3.4.2" />
         <property name="hadoop.version.full" value="0.23" />
+        <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
       </then>
     </elseif>
 
@@ -70,6 +72,7 @@
         <property name="hbase.version" value="0.92.0" />
         <property name="zookeeper.version" value="3.4.2" />
         <property name="hadoop.version.full" value="1.0.0" />
+        <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
       </then>
     </elseif>
 
@@ -80,6 +83,7 @@
         <property name="hbase.version" value="0.94.2" />
         <property name="zookeeper.version" value="3.4.2" />
         <property name="hadoop.version.full" value="2.0.0-alpha" />
+        <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
       </then>
     </elseif>
 
@@ -215,6 +219,13 @@
     -->
   <property name="sqoop.thirdparty.lib.dir" value="" />
 
+  <!-- When testing HCatalog, override this property to point to a directory
+       with this organization.
+    *  /lib - all jar files for hive and hcatalog (can be sym links).
+    *  /hive-conf - Hive config files - (hive-site.xml - can be sym links).
+    *  /hadoop-conf - Hadoop config files *-site.xml - can be sym links).
+    -->
+  <property name="sqoop.hcatalog.lib.dir" value="" />
 
   <!-- Ivy library properties -->
   <property name="ivy.dir" location="${basedir}/ivy" />
@@ -606,7 +617,7 @@
 
   <!-- set variables that configure the actual test -->
   <target name="test-prep" depends="test-prep-normal,test-prep-thirdparty,
-                                    test-prep-manual"/>
+                                    test-prep-manual,test-prep-hcatalog"/>
 
   <target name="test-eval-condition">
     <condition property="thirdparty_or_manual">
@@ -637,6 +648,41 @@
     <property name="test.pattern" value="*ManualTest" />
     <property name="cobertura.testset" value="manual" />
   </target>
+
+  <target name="test-prep-hcatalog" if="sqoop.hcatalog.lib.dir" >
+    <echo message="Checking for HCatalog libraries" />
+    <echo
+       message="sqoop.hcatalog.lib.dir is set to ${sqoop.hcatalog.lib.dir}" />
+    <condition property="sqoop.hcat.lib.present">
+      <and>
+        <!--<isset property="hcatalog"/> -->
+        <available file="${sqoop.hcatalog.lib.dir}/lib" type="dir"/>
+        <available file="${sqoop.hcatalog.lib.dir}/hive-conf" type="dir"/>
+        <available file="${sqoop.hcatalog.lib.dir}/hadoop-conf" type="dir"/>
+      </and>
+    </condition>
+    <if>
+      <equals arg1="${sqoop.hcat.lib.present}" arg2="true"/>
+      <then>
+        <echo message="Configuring hcatalog libs" />
+        <path id="hcatalog.libs">
+          <fileset dir="${sqoop.hcatalog.lib.dir}/lib" includes="*.jar" />
+          <pathelement location="${sqoop.hcatalog.lib.dir}/hive-conf" />
+          <pathelement location="${sqoop.hcatalog.lib.dir}/hadoop-conf" />
+        </path>
+      </then>
+      <else>
+        <path id="hcatalog.libs">
+          <pathelement location="${lib.dir}" />
+        </path>
+      </else>
+    </if>
+    <pathconvert pathsep="${line.separator} -> "
+      property="hcatlibpath" refid="hcatalog.libs"/>
+    <echo
+      message="HCatalog libraries path set to :${line.separator} -> ${hcatlibpath}" />
+  </target>
+
 
   <!-- ================================================================== -->
   <!-- Run unit tests                                                     -->
@@ -756,6 +802,9 @@
       <classpath>
         <!-- instrumented classes go ahead of normal classes -->
         <pathelement location="${cobertura.class.dir}" />
+
+        <!-- hcatalog libs -->
+        <path refid="hcatalog.libs" />
 
         <!-- main classpath here. -->
         <path refid="test.classpath" />

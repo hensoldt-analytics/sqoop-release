@@ -37,6 +37,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 import org.apache.sqoop.util.PerfCounters;
 import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.config.ConfigurationHelper;
@@ -54,7 +55,7 @@ import org.apache.sqoop.validation.*;
 public class ImportJobBase extends JobBase {
 
   private ImportJobContext context;
-
+  protected final boolean isHCatJob;
   public static final Log LOG = LogFactory.getLog(
       ImportJobBase.class.getName());
 
@@ -81,6 +82,7 @@ public class ImportJobBase extends JobBase {
       final ImportJobContext context) {
     super(opts, mapperClass, inputFormatClass, outputFormatClass);
     this.context = context;
+    isHCatJob = options.getHCatTable() != null;
   }
 
   /**
@@ -91,6 +93,14 @@ public class ImportJobBase extends JobBase {
       String tableClassName) throws ClassNotFoundException, IOException {
 
     job.setOutputFormatClass(getOutputFormatClass());
+
+    if (isHCatJob) {
+      LOG.debug("Configuring output format for HCatalog  import job");
+      SqoopHCatUtilities.configureImportOutputFormat(options, job,
+        getContext().getConnManager(), tableName, options.getHCatTable(),
+        job.getConfiguration());
+      return;
+    }
 
     if (options.getFileLayout() == SqoopOptions.FileLayout.SequenceFile) {
       job.getConfiguration().set("mapred.output.value.class", tableClassName);
@@ -149,6 +159,11 @@ public class ImportJobBase extends JobBase {
     perfCounters.startClock();
 
     boolean success = doSubmitJob(job);
+
+    if (isHCatJob) {
+      SqoopHCatUtilities.instance().invokeOutputCommitterForLocalMode(job);
+    }
+
     perfCounters.stopClock();
 
     Counters jobCounters = job.getCounters();

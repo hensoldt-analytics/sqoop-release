@@ -653,6 +653,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
     toolOptions.addUniqueOptions(getInputFormatOptions());
     toolOptions.addUniqueOptions(getHiveOptions(true));
     toolOptions.addUniqueOptions(getHBaseOptions());
+    toolOptions.addUniqueOptions(getHCatalogOptions());
 
     // get common codegen opts.
     RelatedOptions codeGenOpts = getCodeGenOpts(allTables);
@@ -819,6 +820,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
       applyInputFormatOptions(in, out);
       applyCodeGenOptions(in, out, allTables);
       applyHBaseOptions(in, out);
+      applyHCatOptions(in, out);
     } catch (NumberFormatException nfe) {
       throw new InvalidOptionsException("Error: expected numeric argument.\n"
           + "Try --help for usage.");
@@ -892,7 +894,11 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
         != SqoopOptions.IncrementalMode.None && options.isValidationEnabled()) {
       throw new InvalidOptionsException("Validation is not supported for "
         + "incremental imports but single table only.");
-    }
+    } else if ((options.getTargetDir() != null
+      || options.getWarehouseDir() != null) && options.getHCatTable() != null) {
+      throw new InvalidOptionsException("--hcatalog-table cannot be used "
+        + " --warehouse-dir or --target-dir options");
+     }
   }
 
   /**
@@ -936,6 +942,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
     validateOutputFormatOptions(options);
     validateHBaseOptions(options);
     validateHiveOptions(options);
+    validateHCatalogOptions(options);
   }
 }
 

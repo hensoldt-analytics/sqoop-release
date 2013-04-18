@@ -189,6 +189,7 @@ public class CodeGenTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
     validateCodeGenOptions(options);
     validateOutputFormatOptions(options);
     validateHiveOptions(options);
+    validateHCatalogOptions(options);
 
     if (options.getTableName() == null
      && options.getSqlQuery() == null) {

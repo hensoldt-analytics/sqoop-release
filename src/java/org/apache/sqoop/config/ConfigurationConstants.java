@@ -61,6 +61,12 @@ public final class ConfigurationConstants {
                                 "mapred.job.tracker";
 
   /**
+   * The Configuration property identifying the job tracker address (new).
+   */
+  public static final String PROP_MAPREDUCE_JOB_TRACKER_ADDRESS =
+    "mapreduce.jobtracker.address";
+
+  /**
    * The group name of task counters.
    */
   public static final String COUNTER_GROUP_MAPRED_TASK_COUNTERS =
@@ -71,6 +77,11 @@ public final class ConfigurationConstants {
    */
   public static final String COUNTER_MAP_OUTPUT_RECORDS =
                                 "MAP_OUTPUT_RECORDS";
+
+  /**
+   * The name of the parameter for ToolRunner to set jars to add to distcache.
+   */
+  public static final String MAPRED_DISTCACHE_CONF_PARAM = "tmpjars";
 
   /**
    * The name of the counter that tracks input records to the Map phase.
