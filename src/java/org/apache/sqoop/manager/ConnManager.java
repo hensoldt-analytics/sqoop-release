@@ -166,17 +166,24 @@ public abstract class ConnManager {
 
    /**
    * Resolve a database-specific type to HCat data type. Largely follows Sqoop's
-   * hive translation except for float, where we choose float as the type for
-   * HCat
-   *
+   * hive translation.
    * @param sqlType
    *          sql type
    * @return hcat type
    */
   public String toHCatType(int sqlType) {
     switch (sqlType) {
-      case Types.INTEGER:
+
+    // Ideally TINYINT and SMALLINT should be mapped to their
+    // HCat equivalents tinyint and smallint respectively
+    // But the Sqoop Java type conversion has them mapped to Integer
+    // Even though the referenced Java doc clearly recommends otherwise.
+    // Chaning this now can cause many of the sequence file usages to
+    // break as value class implementations will change. So, we
+    // just use the same behavior here.
       case Types.SMALLINT:
+      case Types.TINYINT:
+      case Types.INTEGER:
         return "int";
 
       case Types.VARCHAR:
@@ -197,6 +204,8 @@ public abstract class ConnManager {
 
       case Types.NUMERIC:
       case Types.DECIMAL:
+        return "string";
+
       case Types.DOUBLE:
         return "double";
 
@@ -204,8 +213,6 @@ public abstract class ConnManager {
       case Types.BOOLEAN:
         return "boolean";
 
-      case Types.TINYINT:
-        return "tinyint";
 
       case Types.BIGINT:
         return "bigint";
@@ -213,8 +220,9 @@ public abstract class ConnManager {
       case Types.BINARY:
       case Types.VARBINARY:
       case Types.BLOB:
-      case Types.LONGVARBINARY:
+     case Types.LONGVARBINARY:
         return "binary";
+
       default:
         return null;
     }

@@ -81,7 +81,7 @@ public class ExportJobBase extends JobBase {
 
   protected ExportJobContext context;
 
-  protected boolean isHCatJob;
+  protected final boolean isHCatJob;
 
 
   public ExportJobBase(final ExportJobContext ctxt) {

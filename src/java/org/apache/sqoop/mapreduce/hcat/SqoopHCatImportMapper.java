@@ -37,7 +37,6 @@ import org.apache.hcatalog.common.HCatUtil;
 import org.apache.hcatalog.data.DefaultHCatRecord;
 import org.apache.hcatalog.data.HCatRecord;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
-import org.apache.hcatalog.data.schema.HCatFieldSchema.Type;
 import org.apache.hcatalog.data.schema.HCatSchema;
 import org.apache.hcatalog.mapreduce.InputJobInfo;
 import org.apache.sqoop.lib.SqoopRecord;
@@ -55,14 +54,17 @@ public class SqoopHCatImportMapper extends
   SqoopMapper<LongWritable, SqoopRecord, LongWritable, HCatRecord> {
   public static final Log LOG = LogFactory
     .getLog(SqoopHCatImportMapper.class.getName());
-  private static final boolean DEBUG_HCAT_IMPORT_MAPPER =
-    Boolean.getBoolean("sqoop.debug.import.mapper");
+  public static final String DEBUG_HCAT_IMPORT_MAPPER_PROP =
+    "sqoop.debug.import.mapper";
+  private static boolean debugHCatImportMapper = false;
+
   private InputJobInfo jobInfo;
   private HCatSchema hCatFullTableSchema;
   private int fieldCount;
   private boolean bigDecimalFormatString;
   private LargeObjectLoader lobLoader;
-
+  private HCatSchema partitionSchema = null;
+  private HCatSchema dataColsSchema = null;
   @Override
   protected void setup(Context context)
     throws IOException, InterruptedException {
@@ -70,10 +72,10 @@ public class SqoopHCatImportMapper extends
     String inputJobInfoStr = conf.get(HCatConstants.HCAT_KEY_JOB_INFO);
     jobInfo =
       (InputJobInfo) HCatUtil.deserialize(inputJobInfoStr);
-    HCatSchema tableSchema = jobInfo.getTableInfo().getDataColumns();
-    HCatSchema partitionSchema =
+    dataColsSchema = jobInfo.getTableInfo().getDataColumns();
+    partitionSchema =
       jobInfo.getTableInfo().getPartitionColumns();
-    hCatFullTableSchema = new HCatSchema(tableSchema.getFields());
+    hCatFullTableSchema = new HCatSchema(dataColsSchema.getFields());
     for (HCatFieldSchema hfs : partitionSchema.getFields()) {
       hCatFullTableSchema.append(hfs);
     }
@@ -83,6 +85,9 @@ public class SqoopHCatImportMapper extends
     bigDecimalFormatString = conf.getBoolean(
       ImportJobBase.PROPERTY_BIGDECIMAL_FORMAT,
       ImportJobBase.PROPERTY_BIGDECIMAL_FORMAT_DEFAULT);
+    debugHCatImportMapper = conf.getBoolean(
+      DEBUG_HCAT_IMPORT_MAPPER_PROP, false);
+
   }
 
   @Override
@@ -109,88 +114,155 @@ public class SqoopHCatImportMapper extends
 
   private HCatRecord convertToHCatRecord(SqoopRecord sqr)
     throws IOException {
-    HCatRecord result = new DefaultHCatRecord(fieldCount);
     Map<String, Object> fieldMap = sqr.getFieldMap();
+    HCatRecord result = new DefaultHCatRecord(fieldMap.keySet().size());
+
     for (Map.Entry<String, Object> entry : fieldMap.entrySet()) {
       String key = entry.getKey();
       Object val = entry.getValue();
       HCatFieldSchema hfs = hCatFullTableSchema.get(key.toLowerCase());
-      if (DEBUG_HCAT_IMPORT_MAPPER) {
+      if (debugHCatImportMapper) {
         LOG.debug("SqoopRecordVal: field = " + key + " Val " + val
           + " of type " + (val == null ? null : val.getClass().getName())
           + ", hcattype " + hfs.getTypeString());
       }
-      result.set(key.toLowerCase(), hCatFullTableSchema,
-        toHCat(val, hfs.getType()));
+      Object hCatVal = toHCat(val, hfs.getType(), hfs.getTypeString());
+      // This needs to be checked.
+      // if (hCatVal == null
+      // && partitionSchema.getFieldNames().contains(key.toLowerCase())) {
+      // throw new IOException("Dynamic partition keys cannot be null."
+      // + "  Please make sure that the column " + key
+      // + " is declared as not null in the database");
+      // }
+      result.set(key.toLowerCase(), hCatFullTableSchema, hCatVal);
     }
+
     return result;
   }
 
-  private Object toHCat(Object val, HCatFieldSchema.Type hfsType) {
+  private Object toHCat(Object val, HCatFieldSchema.Type hfsType,
+    String hCatTypeString) {
 
     if (val == null) {
       return null;
     }
 
-    if (val instanceof Boolean
-      || val instanceof Byte
-      || val instanceof Short
-      || val instanceof Integer
-      || val instanceof Long
-      || val instanceof String) {
-      return val;
-    } else if (val instanceof Float) {
-      if (hfsType == HCatFieldSchema.Type.DOUBLE) {
-        return ((Float) val).doubleValue();
-      } else {
-        return val;
-      }
-    } else if (val instanceof Double) {
-      if (hfsType == HCatFieldSchema.Type.FLOAT) {
-        return ((Double) val).floatValue();
-      } else {
-        return val;
-      }
-    } else if (val instanceof BigDecimal) {
-      if (bigDecimalFormatString) {
-        return ((BigDecimal) val).toPlainString();
-      } else {
-        return val.toString();
-      }
-    } else if (val instanceof Date) {
-      if (hfsType == Type.STRING) {
-        return val;
-      } else {
-        return ((Date) val).getTime();
-      }
-    } else if (val instanceof Time) {
-      if (hfsType == Type.STRING) {
-        return val;
-      } else {
-        return ((Time) val).getTime();
-      }
-    } else if (val instanceof Timestamp) {
-      if (hfsType == Type.STRING) {
-        return val;
-      } else {
-        return ((Timestamp) val).getTime();
-      }
-    } else if (val instanceof BytesWritable) {
-      BytesWritable bw = (BytesWritable) val;
-      return bw.getBytes();
-    } else if (val instanceof BlobRef) {
-      BlobRef br = (BlobRef) val;
-      // Save the ref file for externally store BLOBs as hcatalog bytes, or
-      // for inline case, save blob data as hcatalog bytes.
-      byte[] bytes = br.isExternal() ? br.toString().getBytes()
-        : br.getData();
-      return bytes;
-    } else if (val instanceof ClobRef) {
-      return val;
-    }
-    throw new UnsupportedOperationException("Objects of type "
-      + val.getClass().getName() + " are not suported");
+    Object retVal = null;
 
+    if (val instanceof Number) {
+      retVal = convertFromNumberType(val, hfsType);
+    } else if (val instanceof Boolean) {
+      retVal = convertFromBooleanType(val, hfsType);
+    } else if (val instanceof String) {
+      if (hfsType == HCatFieldSchema.Type.STRING) {
+        retVal = val;
+      }
+    } else if (val instanceof java.util.Date) {
+      retVal = convertFromDateTimeTypes(val, hfsType);
+    } else if (val instanceof BytesWritable) {
+      if (hfsType == HCatFieldSchema.Type.BINARY) {
+        BytesWritable bw = (BytesWritable) val;
+        retVal = bw.getBytes();
+      }
+    } else if (val instanceof BlobRef) {
+      if (hfsType == HCatFieldSchema.Type.BINARY) {
+        BlobRef br = (BlobRef) val;
+        byte[] bytes = br.isExternal() ? br.toString().getBytes()
+          : br.getData();
+        retVal = bytes;
+      }
+    } else if (val instanceof ClobRef) {
+      if (hfsType == HCatFieldSchema.Type.STRING) {
+        ClobRef cr = (ClobRef) val;
+        String s = cr.isExternal() ? cr.toString() : cr.getData();
+        retVal = s;
+      }
+    } else {
+      throw new UnsupportedOperationException("Objects of type "
+        + val.getClass().getName() + " are not suported");
+    }
+    if (retVal == null) {
+      throw new UnsupportedOperationException("Objects of type "
+        + val.getClass().getName() + " can not be mapped to HCatalog type "
+        + hCatTypeString);
+    }
+    return retVal;
   }
 
+  private Object convertFromDateTimeTypes(Object val,
+    HCatFieldSchema.Type hfsType) {
+    if (val instanceof java.sql.Date) {
+      if (hfsType == HCatFieldSchema.Type.BIGINT) {
+        return ((Date) val).getTime();
+      } else if (hfsType == HCatFieldSchema.Type.STRING) {
+        return val.toString();
+      }
+    } else if (val instanceof java.sql.Time) {
+      if (hfsType == HCatFieldSchema.Type.BIGINT) {
+        return ((Time) val).getTime();
+      } else if (hfsType == HCatFieldSchema.Type.STRING) {
+        return val.toString();
+      }
+    } else if (val instanceof java.sql.Timestamp) {
+      if (hfsType == HCatFieldSchema.Type.BIGINT) {
+        return ((Timestamp) val).getTime();
+      } else if (hfsType == HCatFieldSchema.Type.STRING) {
+        return val.toString();
+      }
+    }
+    return null;
+  }
+
+  private Object convertFromBooleanType(Object val,
+    HCatFieldSchema.Type hfsType) {
+    Boolean b = (Boolean) val;
+    if (hfsType == HCatFieldSchema.Type.BOOLEAN) {
+      return b;
+    } else if (hfsType == HCatFieldSchema.Type.TINYINT) {
+      return (byte) (b ? 1 : 0);
+    } else if (hfsType == HCatFieldSchema.Type.SMALLINT) {
+      return (short) (b ? 1 : 0);
+    } else if (hfsType == HCatFieldSchema.Type.INT) {
+      return (int) (b ? 1 : 0);
+    } else if (hfsType == HCatFieldSchema.Type.BIGINT) {
+      return (long) (b ? 1 : 0);
+    } else if (hfsType == HCatFieldSchema.Type.FLOAT) {
+      return (float) (b ? 1 : 0);
+    } else if (hfsType == HCatFieldSchema.Type.DOUBLE) {
+      return (double) (b ? 1 : 0);
+    }
+    return null;
+  }
+
+  private Object convertFromNumberType(Object val,
+    HCatFieldSchema.Type hfsType) {
+    if (!(val instanceof Number)) {
+      return null;
+    }
+    if (val instanceof BigDecimal && hfsType == HCatFieldSchema.Type.STRING) {
+      BigDecimal bd = (BigDecimal) val;
+      if (bigDecimalFormatString) {
+        return bd.toPlainString();
+      } else {
+        return bd.toString();
+      }
+    }
+    Number n = (Number) val;
+    if (hfsType == HCatFieldSchema.Type.TINYINT) {
+      return n.byteValue();
+    } else if (hfsType == HCatFieldSchema.Type.SMALLINT) {
+      return n.shortValue();
+    } else if (hfsType == HCatFieldSchema.Type.INT) {
+      return n.intValue();
+    } else if (hfsType == HCatFieldSchema.Type.BIGINT) {
+      return n.longValue();
+    } else if (hfsType == HCatFieldSchema.Type.FLOAT) {
+      return n.floatValue();
+    } else if (hfsType == HCatFieldSchema.Type.DOUBLE) {
+      return n.doubleValue();
+    } else if (hfsType == HCatFieldSchema.Type.BOOLEAN) {
+      return n.byteValue() == 0 ? Boolean.FALSE : Boolean.TRUE;
+    }
+    return null;
+  }
 }

@@ -73,6 +73,8 @@ public final class HCatalogTestUtils {
   private FileSystem fs;
   private final SqoopHCatUtilities utils = SqoopHCatUtilities.instance();
   private static final double DELTAVAL = 1e-10;
+  public static final String SQOOP_HCATALOG_TEST_ARGS =
+    "sqoop.hcatalog.test.args";
   private final boolean initialized = false;
   private HCatalogTestUtils() {
   }
@@ -108,7 +110,7 @@ public final class HCatalogTestUtils {
     return "DROP TABLE IF EXISTS " + dbName + "." + tableName;
   }
 
-  private static String getCreateTableCmd(String dbName,
+  private static String getHCatCreateTableCmd(String dbName,
     String tableName, List<HCatFieldSchema> tableCols,
     List<HCatFieldSchema> partKeys) {
     StringBuilder sb = new StringBuilder();
@@ -122,8 +124,8 @@ public final class HCatalogTestUtils {
       sb.append(hfs.getName()).append(' ').append(hfs.getTypeString());
     }
     sb.append(")\n");
-    if (partKeys != null) {
-      sb.append("\npartitioned by (\n");
+    if (partKeys != null && partKeys.size() > 0) {
+      sb.append("partitioned by (\n");
       for (int i = 0; i < partKeys.size(); ++i) {
         HCatFieldSchema hfs = partKeys.get(i);
         if (i > 0) {
@@ -154,7 +156,7 @@ public final class HCatalogTestUtils {
       LOG.info("Unable to drop table." + dbName + "."
         + tableName + ".   Assuming it did not exist");
     }
-    String createCmd = getCreateTableCmd(databaseName, tableName,
+    String createCmd = getHCatCreateTableCmd(databaseName, tableName,
       tableCols, partKeys);
     utils.launchHCatCli(createCmd);
   }
@@ -240,7 +242,7 @@ public final class HCatalogTestUtils {
 
   public List<HCatRecord> loadHCatTable(String dbName,
     String tableName, Map<String, String> partKeyMap,
-    List<HCatFieldSchema> tblColumns, List<HCatRecord> records)
+    HCatSchema tblSchema, List<HCatRecord> records)
     throws Exception {
 
     Job job = new Job(conf, "HCat load job");
@@ -269,7 +271,7 @@ public final class HCatalogTestUtils {
       partKeyMap);
 
     HCatOutputFormat.setOutput(job, outputJobInfo);
-    HCatOutputFormat.setSchema(job, new HCatSchema(tblColumns));
+    HCatOutputFormat.setSchema(job, tblSchema);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(DefaultHCatRecord.class);
 
@@ -330,6 +332,16 @@ public final class HCatalogTestUtils {
   }
 
   /**
+   * An enumeration type to hold the partition key type of the ColumnGenerator
+   * defined columns.
+   */
+  public enum KeyType {
+    NOT_A_KEY,
+      STATIC_KEY,
+      DYNAMIC_KEY
+  };
+
+  /**
    * When generating data for export tests, each column is generated according
    * to a ColumnGenerator.
    */
@@ -352,18 +364,42 @@ public final class HCatalogTestUtils {
     Object getDBValue(int rowNum);
 
     /** Return the column type to put in the CREATE TABLE statement. */
-    String getHiveType();
+    String getDBTypeString();
 
+    /** Return the SqlType for this column. */
     int getSqlType();
 
+    /** Return the HCat type for this column. */
     HCatFieldSchema.Type getHCatType();
 
+
+    /**
+     * If the field is a partition key, then whether is part of the static
+     * partitioning specification in imports or exports. Only one key can be a
+     * static partitioning key. After the first column marked as static, rest of
+     * the keys will be considered dynamic even if they are marked static.
+     */
+    KeyType getKeyType();
+  }
+
+  /**
+   * Return the column name for a column index. Each table contains two columns
+   * named 'id' and 'msg', and then an arbitrary number of additional columns
+   * defined by ColumnGenerators. These columns are referenced by idx 0, 1, 2
+   * and on.
+   * @param idx
+   *          the index of the ColumnGenerator in the array passed to
+   *          createTable().
+   * @return the name of the column
+   */
+  public static String forIdx(int idx) {
+    return "col" + idx;
   }
 
   public static ColumnGenerator colGenerator(final String name,
-    final String hiveType, final int sqlType,
+    final String dbType, final int sqlType,
     final HCatFieldSchema.Type hCatType, final Object exportValue,
-    final Object verifyValue) {
+    final Object verifyValue, final KeyType keyType) {
     return new ColumnGenerator() {
 
       @Override
@@ -382,8 +418,8 @@ public final class HCatalogTestUtils {
       }
 
       @Override
-      public String getHiveType() {
-        return hiveType;
+      public String getDBTypeString() {
+        return dbType;
       }
 
       @Override
@@ -396,22 +432,11 @@ public final class HCatalogTestUtils {
         return hCatType;
       }
 
-    };
-  }
+      public KeyType getKeyType() {
+        return keyType;
+      }
 
-  /**
-   * Return the column name for a column index. Each table contains two columns
-   * named 'id' and 'msg', and then an arbitrary number of additional columns
-   * defined by ColumnGenerators. These columns are referenced by idx 0, 1, 2
-   * and on.
-   *
-   * @param idx
-   *          the index of the ColumnGenerator in the array passed to
-   *          createTable().
-   * @return the name of the column
-   */
-  public static String forIdx(int idx) {
-    return "col" + idx;
+    };
   }
 
   public static void assertEquals(Object expectedVal,
@@ -547,9 +572,7 @@ public final class HCatalogTestUtils {
     sb.append(" (id INT NOT NULL PRIMARY KEY, msg VARCHAR(64)");
     int colNum = 0;
     for (ColumnGenerator gen : extraCols) {
-      if (gen.getHiveType() != null) {
-        sb.append(", " + forIdx(colNum++) + " " + gen.getHiveType());
-      }
+      sb.append(", " + forIdx(colNum++) + " " + gen.getDBTypeString());
     }
     sb.append(")");
     String cmd = sb.toString();
@@ -565,9 +588,7 @@ public final class HCatalogTestUtils {
     sb.append(" (id, msg");
     int colNum = 0;
     for (ColumnGenerator gen : extraCols) {
-      if (gen.getHiveType() != null) {
-        sb.append(", " + forIdx(colNum++));
-      }
+      sb.append(", " + forIdx(colNum++));
     }
     sb.append(") VALUES ( ?, ?");
     for (int i = 0; i < extraCols.length; ++i) {
@@ -608,20 +629,36 @@ public final class HCatalogTestUtils {
   public HCatSchema createHCatTable(boolean generateOnly, int count,
     String table, ColumnGenerator... extraCols)
     throws Exception {
-    HCatSchema hCatTblSchema = generateHCatSchema(extraCols);
-    createHCatTableUsingSchema(null, table, hCatTblSchema.getFields(), null);
-    if (!generateOnly) {
-      loadHCatTable(hCatTblSchema, table, count, extraCols);
+    HCatSchema hCatTblSchema = generateHCatTableSchema(extraCols);
+    HCatSchema hCatPartSchema = generateHCatPartitionSchema(extraCols);
+    HCatSchema hCatFullSchema = new HCatSchema(hCatTblSchema.getFields());
+    for (HCatFieldSchema hfs : hCatPartSchema.getFields()) {
+      hCatFullSchema.append(hfs);
     }
-    return hCatTblSchema;
+    createHCatTableUsingSchema(null, table,
+      hCatTblSchema.getFields(), hCatPartSchema.getFields());
+    if (!generateOnly) {
+      HCatSchema hCatLoadSchema = new HCatSchema(hCatTblSchema.getFields());
+      HCatSchema dynPartSchema = generateHCatDynamicPartitionSchema(extraCols);
+      for (HCatFieldSchema hfs : dynPartSchema.getFields()) {
+        hCatLoadSchema.append(hfs);
+      }
+      loadHCatTable(hCatLoadSchema, table, count, extraCols);
+    }
+    return hCatFullSchema;
   }
 
   private void loadHCatTable(HCatSchema hCatSchema, String table,
     int count, ColumnGenerator... extraCols)
     throws Exception {
-    List<HCatFieldSchema> hCatTblCols = hCatSchema.getFields();
-    loadHCatTable(null, table, null,
-      hCatTblCols, generateHCatRecords(count, hCatSchema, extraCols));
+    Map<String, String> staticKeyMap = new HashMap<String, String>();
+    for (ColumnGenerator col : extraCols) {
+      if (col.getKeyType() == KeyType.STATIC_KEY) {
+        staticKeyMap.put(col.getName(), (String) col.getHCatValue(0));
+      }
+    }
+    loadHCatTable(null, table, staticKeyMap,
+      hCatSchema, generateHCatRecords(count, hCatSchema, extraCols));
   }
 
   private void loadSqlTable(Connection conn, String table, int count,
@@ -647,7 +684,7 @@ public final class HCatalogTestUtils {
     }
   }
 
-  private HCatSchema generateHCatSchema(ColumnGenerator... extraCols)
+  private HCatSchema generateHCatTableSchema(ColumnGenerator... extraCols)
     throws Exception {
     List<HCatFieldSchema> hCatTblCols = new ArrayList<HCatFieldSchema>();
     hCatTblCols.clear();
@@ -655,16 +692,66 @@ public final class HCatalogTestUtils {
     hCatTblCols
       .add(new HCatFieldSchema("msg", HCatFieldSchema.Type.STRING, ""));
     for (ColumnGenerator gen : extraCols) {
-      hCatTblCols
-        .add(new HCatFieldSchema(gen.getName(), gen.getHCatType(), ""));
+      if (gen.getKeyType() == KeyType.NOT_A_KEY) {
+        hCatTblCols
+          .add(new HCatFieldSchema(gen.getName(), gen.getHCatType(), ""));
+      }
     }
     HCatSchema hCatTblSchema = new HCatSchema(hCatTblCols);
     return hCatTblSchema;
   }
 
-  private List<HCatRecord> generateHCatRecords(int numRecords,
-    HCatSchema hCatTblSchema, ColumnGenerator... extraCols)
+  private HCatSchema generateHCatPartitionSchema(ColumnGenerator... extraCols)
     throws Exception {
+    List<HCatFieldSchema> hCatPartCols = new ArrayList<HCatFieldSchema>();
+
+    for (ColumnGenerator gen : extraCols) {
+      if (gen.getKeyType() != KeyType.NOT_A_KEY) {
+        hCatPartCols
+          .add(new HCatFieldSchema(gen.getName(), gen.getHCatType(), ""));
+      }
+    }
+    HCatSchema hCatPartSchema = new HCatSchema(hCatPartCols);
+    return hCatPartSchema;
+  }
+
+  private HCatSchema generateHCatDynamicPartitionSchema(
+    ColumnGenerator... extraCols) throws Exception {
+    List<HCatFieldSchema> hCatPartCols = new ArrayList<HCatFieldSchema>();
+    hCatPartCols.clear();
+    boolean staticFound = false;
+    for (ColumnGenerator gen : extraCols) {
+      if (gen.getKeyType() != KeyType.NOT_A_KEY) {
+        if (gen.getKeyType() == KeyType.STATIC_KEY && !staticFound) {
+          staticFound = true;
+          continue;
+        }
+        hCatPartCols
+          .add(new HCatFieldSchema(gen.getName(), gen.getHCatType(), ""));
+      }
+    }
+    HCatSchema hCatPartSchema = new HCatSchema(hCatPartCols);
+    return hCatPartSchema;
+
+  }
+
+  private HCatSchema generateHCatStaticPartitionSchema(
+    ColumnGenerator... extraCols) throws Exception {
+    List<HCatFieldSchema> hCatPartCols = new ArrayList<HCatFieldSchema>();
+    hCatPartCols.clear();
+    for (ColumnGenerator gen : extraCols) {
+      if (gen.getKeyType() == KeyType.STATIC_KEY) {
+        hCatPartCols
+          .add(new HCatFieldSchema(gen.getName(), gen.getHCatType(), ""));
+        break;
+      }
+    }
+    HCatSchema hCatPartSchema = new HCatSchema(hCatPartCols);
+    return hCatPartSchema;
+  }
+
+  private List<HCatRecord> generateHCatRecords(int numRecords,
+    HCatSchema hCatTblSchema, ColumnGenerator... extraCols) throws Exception {
     List<HCatRecord> records = new ArrayList<HCatRecord>();
     List<HCatFieldSchema> hCatTblCols = hCatTblSchema.getFields();
     int size = hCatTblCols.size();
@@ -672,10 +759,19 @@ public final class HCatalogTestUtils {
       DefaultHCatRecord record = new DefaultHCatRecord(size);
       record.set(hCatTblCols.get(0).getName(), hCatTblSchema, i);
       record.set(hCatTblCols.get(1).getName(), hCatTblSchema, "textfield" + i);
+      boolean staticFound = false;
+      int idx = 0;
       for (int j = 0; j < extraCols.length; ++j) {
-        record.set(hCatTblCols.get(j + 2).getName(), hCatTblSchema,
+        if (extraCols[j].getKeyType() == KeyType.STATIC_KEY
+          && !staticFound) {
+          staticFound = true;
+          continue;
+        }
+        record.set(hCatTblCols.get(idx + 2).getName(), hCatTblSchema,
           extraCols[j].getHCatValue(i));
+        ++idx;
       }
+
       records.add(record);
     }
     return records;
@@ -698,7 +794,7 @@ public final class HCatalogTestUtils {
   }
 
   public Map<String, String> getAddlTestArgs() {
-    String addlArgs = System.getProperty("sqoop.hcatalog.test.args");
+    String addlArgs = System.getProperty(SQOOP_HCATALOG_TEST_ARGS);
     Map<String, String> addlArgsMap = new HashMap<String, String>();
     if (addlArgs != null) {
       String[] argsArray = addlArgs.split(",");

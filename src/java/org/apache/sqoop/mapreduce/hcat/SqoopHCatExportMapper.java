@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.util.List;
 import java.util.Map;
 
@@ -68,8 +67,18 @@ public class SqoopHCatExportMapper
   private static final String BIG_DECIMAL_TYPE = "java.math.BigDecimal";
   private static final String FLOAT_TYPE = "Float";
   private static final String DOUBLE_TYPE = "Double";
-  private static final boolean DEBUG_HCAT_EXPORT_MAPPER =
-    Boolean.getBoolean("sqoop.debug.export.mapper");
+  private static final String BYTE_TYPE = "Byte";
+  private static final String SHORT_TYPE = "Short";
+  private static final String INTEGER_TYPE = "Integer";
+  private static final String LONG_TYPE = "Long";
+  private static final String BOOLEAN_TYPE = "Boolean";
+  private static final String STRING_TYPE = "String";
+
+  private static final String BYTESWRITABLE =
+    "org.apache.hadoop.io.BytesWritable";
+  public static final String DEBUG_HCAT_EXPORT_MAPPER_PROP =
+    "sqoop.debug.export.mapper";
+  private static boolean debugHCatExportMapper = false;
 
   @Override
   protected void setup(Context context)
@@ -89,7 +98,8 @@ public class SqoopHCatExportMapper
         + ExportJobBase.SQOOP_EXPORT_TABLE_CLASS_KEY
         + ") is not set!");
     }
-
+    debugHCatExportMapper = conf.getBoolean(
+      DEBUG_HCAT_EXPORT_MAPPER_PROP, false);
     try {
       Class cls = Class.forName(recordClassName, true,
         Thread.currentThread().getContextClassLoader());
@@ -135,14 +145,16 @@ public class SqoopHCatExportMapper
       HCatFieldSchema.Type fieldType = field.getType();
       Object hCatVal =
         hcr.get(colName.toLowerCase(), hCatFullTableSchema);
+      String hCatTypeString = field.getTypeString();
       Object sqlVal = convertToSqoop(hCatVal, fieldType,
-        javaColType, sqlType);
-      if (DEBUG_HCAT_EXPORT_MAPPER) {
+        javaColType, hCatTypeString);
+      if (debugHCatExportMapper) {
         LOG.debug("hCatVal " + hCatVal + " of type "
           + (hCatVal == null ? null : hCatVal.getClass().getName())
           + ",sqlVal " + sqlVal + " of type "
           + (sqlVal == null ? null : sqlVal.getClass().getName())
-          + ",java type " + javaColType + ", sql type = " + sqlType);
+          + ",java type " + javaColType + ", sql type = "
+          + SqoopHCatUtilities.sqlTypeString(sqlType));
       }
       sqoopRecord.setField(colName, sqlVal);
     }
@@ -151,7 +163,7 @@ public class SqoopHCatExportMapper
 
   private Object convertToSqoop(Object val,
     HCatFieldSchema.Type fieldType, String javaColType,
-    int sqlType) {
+    String hCatTypeString) {
 
     if (val == null) {
       return null;
@@ -161,32 +173,19 @@ public class SqoopHCatExportMapper
       case INT:
       case TINYINT:
       case SMALLINT:
-      case BOOLEAN:
-        return val;
       case FLOAT:
-        float f;
-        if (val instanceof Double) {
-          f = ((Double) val).floatValue();
-        } else {
-          f = ((Float) val).floatValue();
-        }
-        if (javaColType.equals(FLOAT_TYPE)) {
-          return f;
-        } else {
-          return (double) f;
-        }
       case DOUBLE:
-        double d;
-        if (val instanceof Float) {
-          d = ((Float) val).doubleValue();
-        } else {
-          d = ((Double) val).doubleValue();
+        val = convertToNumberTypes(val, javaColType);
+        if (val != null) {
+          return val;
         }
-        if (javaColType.equals(DOUBLE_TYPE)) {
-          return d;
-        } else {
-          return (float) d;
+        break;
+      case BOOLEAN:
+        val = convertToBooleanTypes(val, javaColType);
+        if (val != null) {
+          return val;
         }
+        break;
       case BIGINT:
         if (javaColType.equals(DATE_TYPE)) {
           return new Date((Long) val);
@@ -194,29 +193,25 @@ public class SqoopHCatExportMapper
           return new Time((Long) val);
         } else if (javaColType.equals(TIMESTAMP_TYPE)) {
           return new Timestamp((Long) val);
+        } else {
+          val = convertToNumberTypes(val, javaColType);
+          if (val != null) {
+            return val;
+          }
         }
-        return val;
+        break;
       case STRING:
-        String valStr = val.toString();
-        if (javaColType.equals(BIG_DECIMAL_TYPE)) {
-          return new BigDecimal(valStr);
-        } else if (javaColType.equals(DATE_TYPE)) {
-          return Date.valueOf(valStr);
-        } else if (javaColType.equals(TIME_TYPE)) {
-          return Time.valueOf(valStr);
-        } else if (javaColType.equals(TIMESTAMP_TYPE)) {
-          return Timestamp.valueOf(valStr);
+        val = convertToStringTypes(val, javaColType);
+        if (val != null) {
+          return val;
         }
-        return valStr;
+        break;
       case BINARY:
-        if (sqlType == Types.BLOB) {
-          throw new IllegalArgumentException("Cannot convert HCatalog type "
-            + fieldType + " to SQL type " + sqlType);
+        val = convertToBinaryTypes(val, javaColType);
+        if (val != null) {
+          return val;
         }
-        BytesWritable bw = new BytesWritable();
-        byte[] bb = (byte[]) val;
-        bw.set(bb, 0, bb.length);
-        return bw;
+        break;
       case ARRAY:
       case MAP:
       case STRUCT:
@@ -224,6 +219,79 @@ public class SqoopHCatExportMapper
         throw new IllegalArgumentException("Cannot convert HCatalog type "
           + fieldType);
     }
+    throw new IllegalArgumentException("Cannot convert HCatalog object of "
+      + " type " + hCatTypeString + " to java object type "
+      + javaColType);
+  }
+
+  private Object convertToBinaryTypes(Object val, String javaColType) {
+    byte[] bb = (byte[]) val;
+    if (javaColType.equals(BYTESWRITABLE)) {
+      BytesWritable bw = new BytesWritable();
+      bw.set(bb, 0, bb.length);
+      return bw;
+    }
+    return null;
+  }
+
+  private Object convertToStringTypes(Object val, String javaColType) {
+    String valStr = val.toString();
+    if (javaColType.equals(BIG_DECIMAL_TYPE)) {
+      return new BigDecimal(valStr);
+    } else if (javaColType.equals(DATE_TYPE)) {
+      return Date.valueOf(valStr);
+    } else if (javaColType.equals(TIME_TYPE)) {
+      return Time.valueOf(valStr);
+    } else if (javaColType.equals(TIMESTAMP_TYPE)) {
+      return Timestamp.valueOf(valStr);
+    } else if (javaColType.equals(STRING_TYPE)) {
+      return valStr;
+    }
+    return null;
+  }
+
+  private Object convertToBooleanTypes(Object val, String javaColType) {
+    Boolean b = (Boolean) val;
+    if (javaColType.equals(BOOLEAN_TYPE)) {
+      return b;
+    } else if (javaColType.equals(BYTE_TYPE)) {
+      return (byte) (b ? 1 : 0);
+    } else if (javaColType.equals(SHORT_TYPE)) {
+      return (short) (b ? 1 : 0);
+    } else if (javaColType.equals(INTEGER_TYPE)) {
+      return (int) (b ? 1 : 0);
+    } else if (javaColType.equals(LONG_TYPE)) {
+      return (long) (b ? 1 : 0);
+    } else if (javaColType.equals(FLOAT_TYPE)) {
+      return (float) (b ? 1 : 0);
+    } else if (javaColType.equals(DOUBLE_TYPE)) {
+      return (double) (b ? 1 : 0);
+    } else if (javaColType.equals(BIG_DECIMAL_TYPE)) {
+      return new BigDecimal(b ? 1 : 0);
+    }
+    return null;
+  }
+
+  private Object convertToNumberTypes(Object val, String javaColType) {
+    Number n = (Number) val;
+    if (javaColType.equals(BYTE_TYPE)) {
+      return n.byteValue();
+    } else if (javaColType.equals(SHORT_TYPE)) {
+      return n.shortValue();
+    } else if (javaColType.equals(INTEGER_TYPE)) {
+      return n.intValue();
+    } else if (javaColType.equals(LONG_TYPE)) {
+      return n.longValue();
+    } else if (javaColType.equals(FLOAT_TYPE)) {
+      return n.floatValue();
+    } else if (javaColType.equals(DOUBLE_TYPE)) {
+      return n.doubleValue();
+    } else if (javaColType.equals(BIG_DECIMAL_TYPE)) {
+      return new BigDecimal(n.doubleValue());
+    } else if (javaColType.equals(BOOLEAN_TYPE)) {
+      return n.byteValue() == 0 ? Boolean.FALSE : Boolean.TRUE;
+    }
+    return null;
   }
 
 }

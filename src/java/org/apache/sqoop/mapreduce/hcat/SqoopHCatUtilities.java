@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -200,7 +201,6 @@ public final class SqoopHCatUtilities {
     sb.append(hCatDatabaseName);
     sb.append('.').append(hCatTableName);
     hCatQualifiedTableName = sb.toString();
-    // Add needed jar files to classpath & dist cache.
 
     String principalID =
       System.getProperty(HCatConstants.HCAT_METASTORE_PRINCIPAL);
@@ -242,7 +242,7 @@ public final class SqoopHCatUtilities {
     int dataFieldsCount = hCatOutputSchema.size();
     if (totalFieldsCount > dataFieldsCount) {
       for (int i = dataFieldsCount; i < totalFieldsCount; ++i) {
-        hCatPartitionSchemaFields.add(hCatOutputSchema.get(i));
+        hCatPartitionSchemaFields.add(hCatFullTableSchema.get(i));
       }
     }
 
@@ -255,8 +255,8 @@ public final class SqoopHCatUtilities {
           + hfs.getName() + " : " + hfs.getTypeString() + ".  Only string "
           + "fields are allowed in partition columns in HCatalog");
       }
-    }
 
+    }
     initDBColumnNamesAndTypes();
 
     List<HCatFieldSchema> outputFieldList = new ArrayList<HCatFieldSchema>();
@@ -286,7 +286,7 @@ public final class SqoopHCatUtilities {
         }
       }
       if (!found) {
-        missingKeys.append('.').append(s);
+        missingKeys.append(',').append(s);
       }
     }
     if (missingKeys.length() > 0) {
@@ -318,7 +318,7 @@ public final class SqoopHCatUtilities {
   /**
    * Get the column names to import.
    */
-  private void initDBColumnNamesAndTypes() {
+  private void initDBColumnNamesAndTypes() throws IOException {
     String[] colNames = options.getColumns();
     if (null != colNames) {
       dbColumnNames = colNames; // user-specified column names.
@@ -332,18 +332,41 @@ public final class SqoopHCatUtilities {
     } else if (null != dbTableName) {
       dbColumnNames =
         connManager.getColumnNames(dbTableName);
+    } else if (options.getCall() != null) {
+      // Read procedure arguments from metadata
+      dbColumnNames = connManager.getColumnNamesForProcedure(
+        this.options.getCall());
     } else {
       dbColumnNames =
         connManager.getColumnNamesForQuery(options.getSqlQuery());
     }
+    Map<String, Integer> colTypes = null;
     if (externalColTypes != null) { // Use pre-defined column types.
-      dbColumnTypes = externalColTypes;
+      colTypes = externalColTypes;
     } else { // Get these from the database.
       if (dbTableName != null) {
-        dbColumnTypes = connManager.getColumnTypes(dbTableName);
+        colTypes = connManager.getColumnTypes(dbTableName);
+      } else if (options.getCall() != null) {
+        // Read procedure arguments from metadata
+        colTypes = connManager.getColumnTypesForProcedure(
+          this.options.getCall());
       } else {
-        dbColumnTypes = connManager.getColumnTypesForQuery(
+        colTypes = connManager.getColumnTypesForQuery(
           options.getSqlQuery());
+      }
+    }
+    if (options.getColumns() == null) {
+      dbColumnTypes = colTypes;
+    } else {
+      dbColumnTypes = new HashMap<String, Integer>();
+      // prune column types based on projection
+      for (String col : dbColumnNames) {
+        Integer type = colTypes.get(col);
+        if (type == null) {
+          throw new IOException("Projected column " + col
+            + " not in list of columns from database");
+        }
+        dbColumnTypes.put(col, type);
       }
     }
   }
@@ -354,7 +377,7 @@ public final class SqoopHCatUtilities {
     for (Object column : userMapping.keySet()) {
       boolean found = false;
       for (String c : dbColumnNames) {
-        if (c.equals(column)) {
+        if (c.equalsIgnoreCase((String) column)) {
           found = true;
           break;
         }
@@ -362,18 +385,24 @@ public final class SqoopHCatUtilities {
 
       if (!found) {
         throw new IllegalArgumentException("Column " + column
-          + "found while mapping database columns to hcatalog columns");
+          + " not found while mapping database columns to hcatalog columns");
       }
     }
 
     fieldPositions = new int[dbColumnNames.length];
 
     for (int indx = 0; indx < dbColumnNames.length; ++indx) {
+      boolean userMapped = false;
       String col = dbColumnNames[indx];
       Integer colType = dbColumnTypes.get(col);
-      String hCatColType = userMapping.getProperty(col);
+      String hCatField = col.toLowerCase();
+      String hCatColType = userMapping.getProperty(hCatField);
       if (hCatColType == null) {
+        LOG.debug("No type mapping for HCatalog filed " + hCatField);
         hCatColType = connManager.toHCatType(colType);
+      } else {
+        LOG.debug("Found type mapping for HCatalog filed " + hCatField);
+        userMapped = true;
       }
       if (null == hCatColType) {
         throw new IOException("HCat does not support the SQL type for column "
@@ -392,11 +421,14 @@ public final class SqoopHCatUtilities {
         throw new IOException("Database column " + col + " not found in "
           + "hcatalog table schema or partition schema");
       }
-      HCatFieldSchema hCatFS = hCatFullTableSchema.get(col.toLowerCase());
-      if (!hCatFS.getTypeString().equalsIgnoreCase(hCatColType)) {
-        throw new IOException("The HCatalog field " + col
-          + " has type " + hCatFS.getTypeString() + ".  Expected = "
-          + hCatColType + " based on database column type : " + colType);
+      if (!userMapped) {
+        HCatFieldSchema hCatFS = hCatFullTableSchema.get(col.toLowerCase());
+        if (!hCatFS.getTypeString().equalsIgnoreCase(hCatColType)) {
+          throw new IOException("The HCatalog field " + col
+            + " has type " + hCatFS.getTypeString() + ".  Expected = "
+            + hCatColType + " based on database column type : "
+            + sqlTypeString(colType));
+        }
       }
 
       if (HiveTypes.isHiveTypeImprovised(colType)) {
@@ -875,4 +907,86 @@ public final class SqoopHCatUtilities {
     return hCatQualifiedTableName;
   }
 
+  public void setConfigured(boolean value) {
+    configured = value;
+  }
+
+  public static String sqlTypeString(int sqlType) {
+    switch (sqlType) {
+      case Types.BIT:
+        return "BIT";
+      case Types.TINYINT:
+        return "TINYINT";
+      case Types.SMALLINT:
+        return "SMALLINT";
+      case Types.INTEGER:
+        return "INTEGER";
+      case Types.BIGINT:
+        return "BIGINT";
+      case Types.FLOAT:
+        return "FLOAT";
+      case Types.REAL:
+        return "REAL";
+      case Types.DOUBLE:
+        return "DOUBLE";
+      case Types.NUMERIC:
+        return "NUMERIC";
+      case Types.DECIMAL:
+        return "DECIMAL";
+      case Types.CHAR:
+        return "CHAR";
+      case Types.VARCHAR:
+        return "VARCHAR";
+      case Types.LONGVARCHAR:
+        return "LONGVARCHAR";
+      case Types.DATE:
+        return "DATE";
+      case Types.TIME:
+        return "TIME";
+      case Types.TIMESTAMP:
+        return "TIMESTAMP";
+      case Types.BINARY:
+        return "BINARY";
+      case Types.VARBINARY:
+        return "VARBINARY";
+      case Types.LONGVARBINARY:
+        return "LONGVARBINARY";
+      case Types.NULL:
+        return "NULL";
+      case Types.OTHER:
+        return "OTHER";
+      case Types.JAVA_OBJECT:
+        return "JAVA_OBJECT";
+      case Types.DISTINCT:
+        return "DISTINCT";
+      case Types.STRUCT:
+        return "STRUCT";
+      case Types.ARRAY:
+        return "ARRAY";
+      case Types.BLOB:
+        return "BLOB";
+      case Types.CLOB:
+        return "CLOB";
+      case Types.REF:
+        return "REF";
+      case Types.DATALINK:
+        return "DATALINK";
+      case Types.BOOLEAN:
+        return "BOOLEAN";
+      case Types.ROWID:
+        return "ROWID";
+      case Types.NCHAR:
+        return "NCHAR";
+      case Types.NVARCHAR:
+        return "NVARCHAR";
+      case Types.LONGNVARCHAR:
+        return "LONGNVARCHAR";
+      case Types.NCLOB:
+        return "NCLOB";
+      case Types.SQLXML:
+        return "SQLXML";
+      default:
+        return "<UNKNOWN>";
+    }
+  }
 }

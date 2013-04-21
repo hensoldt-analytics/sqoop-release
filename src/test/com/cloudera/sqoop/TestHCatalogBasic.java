@@ -25,6 +25,9 @@ import com.cloudera.sqoop.tool.ImportTool;
 
 import junit.framework.TestCase;
 
+/**
+ * Test basic HCatalog related features.
+ */
 public class TestHCatalogBasic extends TestCase {
   private static ImportTool importTool;
   private static ExportTool exportTool;

@@ -19,7 +19,13 @@
 package com.cloudera.sqoop.hcat;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.sql.Date;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,17 +33,20 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hcatalog.data.HCatRecord;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.hcatalog.data.schema.HCatSchema;
+import org.apache.sqoop.mapreduce.hcat.SqoopHCatImportMapper;
+import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 import org.junit.Before;
 
 import com.cloudera.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
+import com.cloudera.sqoop.hcat.HCatalogTestUtils.KeyType;
 import com.cloudera.sqoop.testutil.CommonArgs;
 import com.cloudera.sqoop.testutil.ImportJobTestCase;
 
@@ -48,6 +57,8 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
   private static final Log LOG =
     LogFactory.getLog(HCatalogImportManualTest.class);
   private final HCatalogTestUtils utils = HCatalogTestUtils.instance();
+  private List<String> extraTestArgs = null;
+  private List<String> configParams = null;
 
   @Override
   @Before
@@ -55,6 +66,8 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
     super.setUp();
     try {
       utils.initUtils();
+      extraTestArgs = new ArrayList<String>();
+      configParams = new ArrayList<String>();
     } catch (Exception e) {
       throw new RuntimeException("Error initializing HCatTestUtilis", e);
     }
@@ -82,9 +95,29 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
     return codeGenArgv.toArray(new String[0]);
   }
 
+  private void setExtraArgs(List<String> args) {
+    extraTestArgs.clear();
+    if (args != null && args.size() > 0) {
+      extraTestArgs.addAll(args);
+    }
+  }
+
+  private List<String> getConfigParams() {
+    return configParams;
+  }
+
+  private void setConfigParams(List<String> params) {
+    configParams.clear();
+    if (params != null && params.size() > 0) {
+      configParams.addAll(params);
+    }
+  }
   @Override
   protected List<String> getExtraArgs(Configuration conf) {
     List<String> addlArgsArray = new ArrayList<String>();
+    if (extraTestArgs != null && extraTestArgs.size() > 0) {
+      addlArgsArray.addAll(extraTestArgs);
+    }
     Map<String, String> addlArgsMap = utils.getAddlTestArgs();
     String[] argv = {};
 
@@ -125,7 +158,7 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
     if (includeHadoopFlags) {
       CommonArgs.addHadoopFlags(args);
     }
-
+    args.addAll(getConfigParams());
     args.add("--table");
     args.add(getTableName());
     if (colNames != null) {
@@ -174,77 +207,295 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
       actualVal = rec.get("id", schema);
       LOG.info("Validating field: id (expected = "
         + expectedVal + ", actual = " + actualVal + ")");
-      utils.assertEquals(expectedVal, actualVal);
+      HCatalogTestUtils.assertEquals(expectedVal, actualVal);
       expectedVal = "textfield" + i;
       actualVal = rec.get("msg", schema);
       LOG.info("Validating field: msg (expected = "
         + expectedVal + ", actual = " + actualVal + ")");
-      utils.assertEquals(rec.get("msg", schema), "textfield" + i);
+      HCatalogTestUtils.assertEquals(rec.get("msg", schema), "textfield" + i);
       for (ColumnGenerator col : cols) {
         String name = col.getName().toLowerCase();
         expectedVal = col.getHCatValue(i);
         actualVal = rec.get(name, schema);
         LOG.info("Validating field: " + name + " (expected = "
           + expectedVal + ", actual = " + actualVal + ")");
-        utils.assertEquals(expectedVal, actualVal);
+        HCatalogTestUtils.assertEquals(expectedVal, actualVal);
       }
     }
   }
 
 
-  public void testSupportedHCatTypes() throws Exception {
-    final int TOTAL_RECORDS = 1 * 10;
-    ByteBuffer bb = ByteBuffer.wrap(new byte[] { 0, 1, 2 });
-    String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      utils.colGenerator(utils.forIdx(0), serdeConstants.BOOLEAN_TYPE_NAME,
-          Types.BOOLEAN, HCatFieldSchema.Type.BOOLEAN, Boolean.TRUE,
-          Boolean.TRUE),
-      utils.colGenerator(utils.forIdx(1), serdeConstants.INT_TYPE_NAME,
-        Types.INTEGER, HCatFieldSchema.Type.INT, 100, 100),
-      utils.colGenerator(utils.forIdx(2), serdeConstants.BIGINT_TYPE_NAME,
-        Types.BIGINT, HCatFieldSchema.Type.BIGINT, 200L, 200L),
-      utils.colGenerator(utils.forIdx(3), serdeConstants.FLOAT_TYPE_NAME,
-        Types.FLOAT, HCatFieldSchema.Type.FLOAT, 10.0F, 10.F),
-      utils.colGenerator(utils.forIdx(4), serdeConstants.DOUBLE_TYPE_NAME,
-        Types.DOUBLE, HCatFieldSchema.Type.DOUBLE, 20.0D, 20.0D),
-      utils.colGenerator(utils.forIdx(5), serdeConstants.BINARY_TYPE_NAME,
-        Types.BINARY, HCatFieldSchema.Type.BINARY, bb.array(), bb.array()),
-    };
+  private void runHCatImport(List<String> addlArgsArray,
+    int totalRecords, String table, ColumnGenerator[] cols,
+    String[] cNames) throws Exception {
     HCatSchema tblSchema =
-      utils.createHCatTable(true, TOTAL_RECORDS, table, cols);
-    utils.createSqlTable(getConnection(), false, TOTAL_RECORDS, table, cols);
-    List<String> addlArgsArray = new ArrayList<String>();
+      utils.createHCatTable(true, totalRecords, table, cols);
+    utils.createSqlTable(getConnection(), false, totalRecords, table, cols);
     Map<String, String> addlArgsMap = utils.getAddlTestArgs();
     String[] argv = {};
-
+    addlArgsArray.add("-m");
+    addlArgsArray.add("1");
+    addlArgsArray.add("--hcatalog-table");
+    addlArgsArray.add(table);
     if (addlArgsMap.containsKey("-libjars")) {
       argv = new String[2];
       argv[0] = "-libjars";
       argv[1] = addlArgsMap.get("-libjars");
     }
-    addlArgsArray.add("-m");
-    addlArgsArray.add("1");
-    addlArgsArray.add("--hcatalog-table");
-    addlArgsArray.add(table);
     for (String k : addlArgsMap.keySet()) {
       if (!k.equals("-libjars")) {
         addlArgsArray.add(k);
         addlArgsArray.add(addlArgsMap.get(k));
       }
     }
-    String[] colNames = new String[2 + cols.length];
-    colNames[0] = "ID";
-    colNames[1] = "MSG";
-    for (int i = 0; i < cols.length; ++i) {
-      colNames[2 + i] = cols[i].getName().toUpperCase();
+    String[] colNames = null;
+    if (cNames != null) {
+      colNames = cNames;
+    } else {
+      colNames = new String[2 + cols.length];
+      colNames[0] = "ID";
+      colNames[1] = "MSG";
+      for (int i = 0; i < cols.length; ++i) {
+        colNames[2 + i] = cols[i].getName().toUpperCase();
+      }
     }
     String[] importArgs = getArgv(true, colNames, new Configuration());
     LOG.debug("Import args = " + Arrays.toString(importArgs));
+    SqoopHCatUtilities.instance().setConfigured(false);
     runImport(importArgs);
     List<HCatRecord> recs = utils.readHCatRecords(null, table, null);
     LOG.debug("HCat records ");
     LOG.debug(utils.hCatRecordDump(recs, tblSchema));
     validateHCatRecords(recs, tblSchema, 10, cols);
+  }
+
+  public void testIntTypes() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "boolean", Types.BOOLEAN, HCatFieldSchema.Type.BOOLEAN,
+        Boolean.TRUE, Boolean.TRUE, KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "tinyint", Types.INTEGER, HCatFieldSchema.Type.INT, 10,
+        10, KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+        "smallint", Types.INTEGER, HCatFieldSchema.Type.INT, 100,
+        100, KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
+        "int", Types.INTEGER, HCatFieldSchema.Type.INT, 1000,
+        1000, KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(4),
+        "bigint", Types.BIGINT, HCatFieldSchema.Type.BIGINT, 10000L,
+        10000L, KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testFloatTypes() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "float", Types.FLOAT, HCatFieldSchema.Type.FLOAT, 10.0F,
+        10.F, KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "real", Types.FLOAT, HCatFieldSchema.Type.FLOAT, 20.0F,
+        20.0F, KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+        "double", Types.DOUBLE, HCatFieldSchema.Type.DOUBLE, 30.0D,
+        30.0D, KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testNumberTypes() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "numeric(18,2)", Types.NUMERIC, HCatFieldSchema.Type.STRING, "1000",
+        new BigDecimal("1000"), KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "decimal(18,2)", Types.DECIMAL, HCatFieldSchema.Type.STRING, "2000",
+        new BigDecimal("2000"), KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testDateTypes() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "date", Types.DATE, HCatFieldSchema.Type.STRING, "2013-12-31",
+        new Date(113, 11, 31), KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "time", Types.TIME, HCatFieldSchema.Type.STRING, "10:11:12",
+        new Time(10, 11, 12), KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+        "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.STRING,
+        "2013-12-31 10:11:12.0", new Timestamp(113, 11, 31, 10, 11, 12, 0),
+        KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testDateTypesToBigInt() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    long offset = TimeZone.getDefault().getRawOffset();
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "date", Types.DATE, HCatFieldSchema.Type.BIGINT, 0 - offset,
+        new Date(70, 0, 1), KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "time", Types.TIME, HCatFieldSchema.Type.BIGINT, 36672000L - offset,
+        new Time(10, 11, 12), KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+        "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.BIGINT,
+        36672000L - offset, new Timestamp(70, 0, 1, 10, 11, 12, 0),
+        KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--map-column-hive");
+    addlArgsArray.add("col0=bigint,col1=bigint,col2=bigint");
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testStringTypes() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "char(10)", Types.CHAR, HCatFieldSchema.Type.STRING, "string to test",
+        "string to test", KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "longvarchar", Types.LONGVARCHAR, HCatFieldSchema.Type.STRING,
+        "string to test", "string to test", KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testBinaryTypes() throws Exception {
+    ByteBuffer bb = ByteBuffer.wrap(new byte[] { 0, 1, 2 });
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "binary(10)", Types.BINARY, HCatFieldSchema.Type.BINARY,
+        bb.array(), bb.array(), KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "longvarbinary", Types.BINARY, HCatFieldSchema.Type.BINARY,
+        bb.array(), bb.array(), KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testColumnProjection() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        null, null, KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    List<String> cfgParams = new ArrayList<String>();
+    cfgParams.add("-D");
+    cfgParams.add(SqoopHCatImportMapper.DEBUG_HCAT_IMPORT_MAPPER_PROP
+      + "=true");
+    setConfigParams(cfgParams);
+    String[] colNames = new String[] { "ID", "MSG" };
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, colNames);
+  }
+
+  public void testColumnProjectionMissingPartKeys() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        null, null, KeyType.DYNAMIC_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    List<String> cfgParams = new ArrayList<String>();
+    cfgParams.add("-D");
+    cfgParams.add(SqoopHCatImportMapper.DEBUG_HCAT_IMPORT_MAPPER_PROP
+      + "=true");
+    setConfigParams(cfgParams);
+    String[] colNames = new String[] { "ID", "MSG" };
+    try {
+      runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, colNames);
+      fail("Column projection with missing dynamic partition keys must fail");
+    } catch (Throwable t) {
+      LOG.info("Job fails as expected : " + t);
+      StringWriter sw = new StringWriter();
+      t.printStackTrace(new PrintWriter(sw));
+      LOG.info("Exception stack trace = " + sw);
+    }
+  }
+  public void testStaticPartitioning() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "1", "1", KeyType.STATIC_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-partition-key");
+    addlArgsArray.add("col0");
+    addlArgsArray.add("--hive-partition-value");
+    addlArgsArray.add("1");
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testDynamicPartitioning() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "1", "1", KeyType.DYNAMIC_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testStaicAndDynamicPartitioning() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    ByteBuffer bb = ByteBuffer.wrap(new byte[] { 0, 1, 2 });
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "1", "1", KeyType.STATIC_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "2", "2", KeyType.DYNAMIC_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-partition-key");
+    addlArgsArray.add("col0");
+    addlArgsArray.add("--hive-partition-value");
+    addlArgsArray.add("1");
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
   }
 }
