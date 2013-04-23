@@ -76,6 +76,11 @@ public final class HCatalogTestUtils {
   public static final String SQOOP_HCATALOG_TEST_ARGS =
     "sqoop.hcatalog.test.args";
   private final boolean initialized = false;
+  private static String storageInfo = null;
+  public static final String STORED_AS_RCFILE = "stored as\n\trcfile\n";
+  public static final String STORED_AS_SEQFILE = "stored as\n\tsequencefile\n";
+  public static final String STORED_AS_TEXT = "stored as\n\ttextfile\n";
+
   private HCatalogTestUtils() {
   }
 
@@ -102,8 +107,20 @@ public final class HCatalogTestUtils {
     }
     fs = FileSystem.get(conf);
     fs.initialize(fs.getWorkingDirectory().toUri(), conf);
+    storageInfo = null;
   }
 
+  public static String getStorageInfo() {
+    if (null != storageInfo && storageInfo.length() > 0) {
+      return storageInfo;
+    } else {
+      return STORED_AS_RCFILE;
+    }
+  }
+
+  public void setStorageInfo(String info) {
+    storageInfo = info;
+  }
 
   private static String getDropTableCmd(final String dbName,
     final String tableName) {
@@ -135,7 +152,7 @@ public final class HCatalogTestUtils {
       }
       sb.append(")\n");
     }
-    sb.append("stored as\n\trcfile\n");
+    sb.append(getStorageInfo());
     return sb.toString();
   }
 

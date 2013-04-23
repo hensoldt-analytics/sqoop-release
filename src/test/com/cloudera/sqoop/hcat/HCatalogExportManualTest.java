@@ -328,4 +328,47 @@ public class HCatalogExportManualTest extends ExportJobTestCase {
     addlArgsArray.add("1");
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
   }
+
+  /**
+   * Test other file formats.
+   */
+  public void testSequenceFile() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, "1",
+            "1", KeyType.STATIC_KEY),
+        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, "2",
+            "2", KeyType.DYNAMIC_KEY), };
+
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-partition-key");
+    addlArgsArray.add("col0");
+    addlArgsArray.add("--hive-partition-value");
+    addlArgsArray.add("1");
+    utils.setStorageInfo(HCatalogTestUtils.STORED_AS_SEQFILE);
+    runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
+  }
+
+  public void testTextFile() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, "1",
+            "1", KeyType.STATIC_KEY),
+        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, "2",
+            "2", KeyType.DYNAMIC_KEY), };
+
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-partition-key");
+    addlArgsArray.add("col0");
+    addlArgsArray.add("--hive-partition-value");
+    addlArgsArray.add("1");
+    utils.setStorageInfo(HCatalogTestUtils.STORED_AS_TEXT);
+    runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
+  }
 }

@@ -32,10 +32,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DefaultStringifier;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hcatalog.common.HCatConstants;
 import org.apache.hcatalog.common.HCatUtil;
@@ -51,8 +51,8 @@ import org.apache.sqoop.mapreduce.ExportJobBase;
  * A mapper that works on combined hcat splits.
  */
 public class SqoopHCatExportMapper
-  extends AutoProgressMapper<LongWritable, HCatRecord,
-  SqoopRecord, NullWritable> {
+    extends
+    AutoProgressMapper<WritableComparable, HCatRecord, SqoopRecord, WritableComparable> {
   public static final Log LOG = LogFactory
     .getLog(SqoopHCatExportMapper.class.getName());
   private InputJobInfo jobInfo;
@@ -127,7 +127,7 @@ public class SqoopHCatExportMapper
   }
 
   @Override
-  public void map(LongWritable key, HCatRecord value,
+  public void map(WritableComparable key, HCatRecord value,
     Context context)
     throws IOException, InterruptedException {
     context.write(convertToSqoopRecord(value), NullWritable.get());

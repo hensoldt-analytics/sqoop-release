@@ -31,7 +31,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hcatalog.common.HCatConstants;
 import org.apache.hcatalog.common.HCatUtil;
 import org.apache.hcatalog.data.DefaultHCatRecord;
@@ -51,7 +51,7 @@ import com.cloudera.sqoop.lib.LargeObjectLoader;
  * A mapper for HCatalog import.
  */
 public class SqoopHCatImportMapper extends
-  SqoopMapper<LongWritable, SqoopRecord, LongWritable, HCatRecord> {
+    SqoopMapper<WritableComparable, SqoopRecord, WritableComparable, HCatRecord> {
   public static final Log LOG = LogFactory
     .getLog(SqoopHCatImportMapper.class.getName());
   public static final String DEBUG_HCAT_IMPORT_MAPPER_PROP =
@@ -91,7 +91,7 @@ public class SqoopHCatImportMapper extends
   }
 
   @Override
-  public void map(LongWritable key, SqoopRecord value,
+  public void map(WritableComparable key, SqoopRecord value,
     Context context)
     throws IOException, InterruptedException {
 
