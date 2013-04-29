@@ -51,7 +51,7 @@
       <property name="hbase.version" value="0.90.3-cdh3u1" />
       <property name="zookeeper.version" value="3.3.3-cdh3u1" />
       <property name="hadoop.version.full" value="0.20" />
-      <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
+      <property name="hcatalog.version" value="0.6.0-SNAPSHOT" />
     </then>
 
     <elseif>
@@ -61,7 +61,7 @@
         <property name="hbase.version" value="0.92.0" />
         <property name="zookeeper.version" value="3.4.2" />
         <property name="hadoop.version.full" value="0.23" />
-        <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
+        <property name="hcatalog.version" value="0.6.0-SNAPSHOT" />
       </then>
     </elseif>
 
@@ -72,7 +72,7 @@
         <property name="hbase.version" value="0.92.0" />
         <property name="zookeeper.version" value="3.4.2" />
         <property name="hadoop.version.full" value="1.0.0" />
-        <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
+        <property name="hcatalog.version" value="0.6.0-SNAPSHOT" />
       </then>
     </elseif>
 
@@ -83,7 +83,7 @@
         <property name="hbase.version" value="0.94.2" />
         <property name="zookeeper.version" value="3.4.2" />
         <property name="hadoop.version.full" value="2.0.0-alpha" />
-        <property name="hcatalog.version" value="0.5.0-SNAPSHOT" />
+        <property name="hcatalog.version" value="0.6.0-SNAPSHOT" />
       </then>
     </elseif>
 
@@ -101,10 +101,10 @@
   <property environment="env"/>
   <property name="name" value="sqoop" />
   <property name="Name" value="Sqoop" />
-  <property name="version" value="1.4.3" />
+  <property name="version" value="1.4.4-SNAPSHOT" />
 
   <!-- The last version released. -->
-  <property name="oldversion" value="1.4.2" />
+  <property name="oldversion" value="1.4.3" />
   <!-- The point when we branched for the previous release. -->
   <property name="prev.git.hash"
       value="166417fdb0afd3141c6fd0fdc50043b5e13c2a97" />
@@ -171,6 +171,7 @@
   <property name="src.tar.file" location="${build.dir}/${src.artifact.name}.tar.gz" />
 
   <!-- compilation -->
+  <property name="targetJavaVersion" value="1.6" />
   <property name="javac.deprecation" value="off"/>
   <property name="javac.debug" value="on"/>
   <property name="build.encoding" value="ISO-8859-1"/>
@@ -219,13 +220,6 @@
     -->
   <property name="sqoop.thirdparty.lib.dir" value="" />
 
-  <!-- When testing HCatalog, override this property to point to a directory
-       with this organization.
-    *  /lib - all jar files for hive and hcatalog (can be sym links).
-    *  /hive-conf - Hive config files - (hive-site.xml - can be sym links).
-    *  /hadoop-conf - Hadoop config files *-site.xml - can be sym links).
-    -->
-  <property name="sqoop.hcatalog.lib.dir" value="" />
 
   <!-- Ivy library properties -->
   <property name="ivy.dir" location="${basedir}/ivy" />
@@ -268,6 +262,17 @@
 
   <property name="java.security.krb5.kdc"
             value="kdc0.ox.ac.uk:kdc1.ox.ac.uk"/>
+
+  <condition property="windows">
+    <os family="windows" />
+  </condition>
+
+  <condition property="skip-real-docs">
+    <or>
+      <isset property="docs.uptodate" />
+      <os family="windows" />
+    </or>
+  </condition>
 
   <if>
     <isset property="sqoop.test.msserver.connector.factory"/>
@@ -337,12 +342,25 @@
 
   <!-- generate the version information class. -->
   <target name="gen-version" depends="init">
-    <exec executable="${script.src.dir}/write-version-info.sh"
-        dir="${basedir}" failonerror="true">
-      <arg value="${build.dir}" />
-      <arg value="${version}" />
-      <arg value="${git.hash}" />
-    </exec>
+    <if>
+      <equals arg1="${windows}" arg2="true" />
+      <then>
+        <exec executable="${script.src.dir}/write-version-info.cmd"
+            dir="${basedir}" failonerror="true">
+          <arg value="${build.dir}" />
+          <arg value="${version}" />
+          <arg value="${git.hash}" />
+        </exec>
+      </then>
+      <else>
+        <exec executable="${script.src.dir}/write-version-info.sh"
+            dir="${basedir}" failonerror="true">
+          <arg value="${build.dir}" />
+          <arg value="${version}" />
+          <arg value="${git.hash}" />
+        </exec>
+      </else>
+    </if>
   </target>
 
   <!-- Compile core classes for the project -->
@@ -361,6 +379,7 @@
         includes="**/*.java"
         destdir="${build.classes}"
         debug="${javac.debug}"
+        target="${targetJavaVersion}"
         deprecation="${javac.deprecation}">
       <classpath refid="compile.classpath"/>
     </javac>
@@ -372,6 +391,7 @@
         includes="**/*.java"
         destdir="${build.classes}"
         debug="${javac.debug}"
+        target="${targetJavaVersion}"
         deprecation="${javac.deprecation}">
       <classpath refid="compile.classpath"/>
     </javac>
@@ -386,6 +406,7 @@
         srcdir="${test.dir}"
         includes="**/*.java"
         destdir="${build.test.classes}"
+        target="${targetJavaVersion}"
         debug="${javac.debug}">
       <classpath>
         <path refid="test.classpath"/>
@@ -402,6 +423,7 @@
         srcdir="${perftest.src.dir}"
         includes="**/*.java"
         destdir="${build.perftest.classes}"
+        target="${targetJavaVersion}"
         debug="${javac.debug}">
       <classpath>
         <path refid="test.classpath"/>
@@ -432,21 +454,43 @@
          the wrapper scripts to invoke each of these.
       -->
     <mkdir dir="${build.bin.dir}" />
-    <java classname="com.cloudera.sqoop.Sqoop"
-        fork="true"
-        failonerror="true"
-        output="${build.dir}/tools-list"
-        error="/dev/null">
-      <jvmarg value="-Dhadoop.security.log.file=./build/security-audit.log" />
-      <arg value="help" />
-      <classpath refid="compile.classpath"/>
-    </java>
-    <exec executable="${script.src.dir}/create-tool-scripts.sh"
-        dir="${basedir}" failonerror="true">
-      <arg value="${build.bin.dir}" />
-      <arg value="${script.src.dir}/tool-script.sh.template" />
-      <arg value="${build.dir}/tools-list" />
-    </exec>
+    <if>
+      <equals arg1="${windows}" arg2="true" />
+      <then>
+        <java classname="com.cloudera.sqoop.Sqoop"
+            fork="true"
+            failonerror="true"
+            output="${build.dir}/tools-list"
+            error="NUL">
+          <jvmarg value="-Dhadoop.security.log.file=./build/security-audit.log" />
+          <arg value="help" />
+          <classpath refid="compile.classpath"/>
+        </java>
+        <exec executable="${script.src.dir}/create-tool-scripts.cmd"
+            dir="${basedir}" failonerror="true">
+          <arg value="${build.bin.dir}" />
+          <arg value="${script.src.dir}/tool-script.cmd.template" />
+          <arg value="${build.dir}/tools-list" />
+        </exec>
+      </then>
+      <else>
+        <java classname="com.cloudera.sqoop.Sqoop"
+            fork="true"
+            failonerror="true"
+            output="${build.dir}/tools-list"
+            error="/dev/null">
+          <jvmarg value="-Dhadoop.security.log.file=./build/security-audit.log" />
+          <arg value="help" />
+          <classpath refid="compile.classpath"/>
+        </java>
+        <exec executable="${script.src.dir}/create-tool-scripts.sh"
+            dir="${basedir}" failonerror="true">
+          <arg value="${build.bin.dir}" />
+          <arg value="${script.src.dir}/tool-script.sh.template" />
+          <arg value="${build.dir}/tools-list" />
+        </exec>
+      </else>
+    </if>
   </target>
 
   <target name="package"
@@ -471,14 +515,13 @@
 
     <!-- move the license in trunk to a temporary location and copy
          appropriate license in the trunk, ultimately in the package. -->
-    <move file="${basedir}/LICENSE.txt" tofile="${base.src.dir}/licenses/LICENSE-TEMP.txt"/>
+    <move file="${basedir}/LICENSE.txt" tofile="${build.dir}/LICENSE-TEMP.txt"/>
     <copy file="${base.src.dir}/licenses/LICENSE-BIN.txt" tofile="${basedir}/LICENSE.txt"/>
     <!-- copy in various components of the initial source layout
          so that the redistributable can bootstrap itself. -->
     <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="false">
       <fileset dir="${basedir}">
         <include name="**/*" />
-        <exclude name="src/licenses/**" />
         <exclude name="build/**" />
         <exclude name="lib/**" />
         <exclude name=".git/**" />
@@ -490,7 +533,7 @@
       </fileset>
     </copy>
     <!-- move back the license in trunk -->
-    <move file="${base.src.dir}/licenses/LICENSE-TEMP.txt" tofile="${basedir}/LICENSE.txt"/>
+    <move file="${build.dir}/LICENSE-TEMP.txt" tofile="${basedir}/LICENSE.txt"/>
 
     <!-- copy the dependency libraries from ivy into the output lib dir -->
     <mkdir dir="${dist.dir}/lib"/>
@@ -561,6 +604,7 @@
       <tarfileset dir="${build.dir}" mode="755">
         <include name="${bin.artifact.name}/bin/*" />
         <include name="${bin.artifact.name}/testdata/hive/bin/*" />
+        <include name="${bin.artifact.name}/testdata/hcatalog/conf/*" />
         <include name="${bin.artifact.name}/**/*.sh" />
       </tarfileset>
     </tar>
@@ -604,12 +648,14 @@
       <tarfileset dir="${build.dir}" mode="664">
         <exclude name="${src.artifact.name}/bin/*" />
         <exclude name="${src.artifact.name}/testdata/hive/bin/*" />
+        <exclude name="${src.artifact.name}/testdata/hcatalog/conf/*" />
         <exclude name="${src.artifact.name}/**/*.sh" />
         <include name="${src.artifact.name}/**" />
       </tarfileset>
       <tarfileset dir="${build.dir}" mode="755">
         <include name="${src.artifact.name}/bin/*" />
         <include name="${src.artifact.name}/testdata/hive/bin/*" />
+        <include name="${src.artifact.name}/testdata/hcatalog/conf/*" />
         <include name="${src.artifact.name}/**/*.sh" />
       </tarfileset>
     </tar>
@@ -617,7 +663,7 @@
 
   <!-- set variables that configure the actual test -->
   <target name="test-prep" depends="test-prep-normal,test-prep-thirdparty,
-                                    test-prep-manual,test-prep-hcatalog"/>
+                                    test-prep-manual"/>
 
   <target name="test-eval-condition">
     <condition property="thirdparty_or_manual">
@@ -628,11 +674,16 @@
     </condition>
   </target>
 
+
+
   <target name="test-prep-normal" unless="thirdparty_or_manual"
                                   depends="test-eval-condition">
     <!-- Set this to run all the "standard" tests -->
     <property name="test.pattern" value="Test*" />
     <property name="cobertura.testset" value="base" />
+    <path id="hcatalog.conf.dir">
+       <pathelement location="${basedir}/testdata/hcatalog/conf"/>
+    </path>
   </target>
 
   <target name="test-prep-thirdparty" if="thirdparty">
@@ -648,41 +699,6 @@
     <property name="test.pattern" value="*ManualTest" />
     <property name="cobertura.testset" value="manual" />
   </target>
-
-  <target name="test-prep-hcatalog" if="sqoop.hcatalog.lib.dir" >
-    <echo message="Checking for HCatalog libraries" />
-    <echo
-       message="sqoop.hcatalog.lib.dir is set to ${sqoop.hcatalog.lib.dir}" />
-    <condition property="sqoop.hcat.lib.present">
-      <and>
-        <!--<isset property="hcatalog"/> -->
-        <available file="${sqoop.hcatalog.lib.dir}/lib" type="dir"/>
-        <available file="${sqoop.hcatalog.lib.dir}/hive-conf" type="dir"/>
-        <available file="${sqoop.hcatalog.lib.dir}/hadoop-conf" type="dir"/>
-      </and>
-    </condition>
-    <if>
-      <equals arg1="${sqoop.hcat.lib.present}" arg2="true"/>
-      <then>
-        <echo message="Configuring hcatalog libs" />
-        <path id="hcatalog.libs">
-          <fileset dir="${sqoop.hcatalog.lib.dir}/lib" includes="*.jar" />
-          <pathelement location="${sqoop.hcatalog.lib.dir}/hive-conf" />
-          <pathelement location="${sqoop.hcatalog.lib.dir}/hadoop-conf" />
-        </path>
-      </then>
-      <else>
-        <path id="hcatalog.libs">
-          <pathelement location="${lib.dir}" />
-        </path>
-      </else>
-    </if>
-    <pathconvert pathsep="${line.separator} -> "
-      property="hcatlibpath" refid="hcatalog.libs"/>
-    <echo
-      message="HCatalog libraries path set to :${line.separator} -> ${hcatlibpath}" />
-  </target>
-
 
   <!-- ================================================================== -->
   <!-- Run unit tests                                                     -->
@@ -708,7 +724,7 @@
     <delete dir="${test.log.dir}"/>
     <mkdir dir="${test.log.dir}"/>
     <delete dir="${build.test}/data"/>
-    <mkdir dir="${build.test}/data" />
+    <mkdir dir="${build.test}/data/sqoop" />
     <mkdir dir="${cobertura.class.dir}" />
     <junit
       printsummary="yes" showoutput="${test.output}"
@@ -799,12 +815,16 @@
       <sysproperty key="java.security.krb5.kdc"
                    value="${java.security.krb5.kdc}"/>
 
+      <!-- Location of Hive logs -->
+      <!--<sysproperty key="hive.log.dir"
+                   value="${test.build.data}/sqoop/logs"/> -->
+
       <classpath>
         <!-- instrumented classes go ahead of normal classes -->
         <pathelement location="${cobertura.class.dir}" />
 
-        <!-- hcatalog libs -->
-        <path refid="hcatalog.libs" />
+        <!-- Location of hive-site xml and other hadoop config files -->
+        <path refid="hcatalog.conf.dir" />
 
         <!-- main classpath here. -->
         <path refid="test.classpath" />
@@ -897,7 +917,7 @@
     <echo message="Release audit report: ${build.dir}/rat.log" />
   </target>
 
-  <target name="mvn-prep" depends="init,ivy-resolve-test" unless="mvn-prep.called">
+  <target name="mvn-prep" depends="init,ivy-resolve-test">
     <!-- prepare for mvn tasks. -->
 
     <!-- Download maven -->
@@ -931,7 +951,6 @@
         <include name="*.pom" />
       </fileset>
     </replaceregexp>
-    <property name="mvn-prep.called" value="true" />
   </target>
 
   <target name="srcjars" depends="init,jar-all"
@@ -986,7 +1005,7 @@
   <target name="docs" depends="real-docs,relnotes,javadoc"
       description="Build documentation"/>
 
-  <target name="real-docs" depends="docs-uptodate,init" unless="docs.uptodate">
+  <target name="real-docs" depends="docs-uptodate,init" unless="skip-real-docs">
     <exec executable="make" failonerror="true">
       <arg value="-C" />
       <arg value="${basedir}/src/docs" />

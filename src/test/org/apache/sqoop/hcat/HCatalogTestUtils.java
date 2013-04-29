@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.cloudera.sqoop.hcat;
+package org.apache.sqoop.hcat;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -124,35 +124,39 @@ public final class HCatalogTestUtils {
 
   private static String getDropTableCmd(final String dbName,
     final String tableName) {
-    return "DROP TABLE IF EXISTS " + dbName + "." + tableName;
+    return "DROP TABLE IF EXISTS " + dbName.toLowerCase() + "."
+      + tableName.toLowerCase();
   }
 
   private static String getHCatCreateTableCmd(String dbName,
     String tableName, List<HCatFieldSchema> tableCols,
     List<HCatFieldSchema> partKeys) {
     StringBuilder sb = new StringBuilder();
-    sb.append("create table ").append(dbName).append('.');
-    sb.append(tableName).append(" (\n\t");
+    sb.append("create table ").append(dbName.toLowerCase()).append('.');
+    sb.append(tableName.toLowerCase()).append(" (\n\t");
     for (int i = 0; i < tableCols.size(); ++i) {
       HCatFieldSchema hfs = tableCols.get(i);
       if (i > 0) {
         sb.append(",\n\t");
       }
-      sb.append(hfs.getName()).append(' ').append(hfs.getTypeString());
+      sb.append(hfs.getName().toLowerCase());
+      sb.append(' ').append(hfs.getTypeString());
     }
     sb.append(")\n");
     if (partKeys != null && partKeys.size() > 0) {
-      sb.append("partitioned by (\n");
+      sb.append("partitioned by (\n\t");
       for (int i = 0; i < partKeys.size(); ++i) {
         HCatFieldSchema hfs = partKeys.get(i);
         if (i > 0) {
           sb.append("\n\t,");
         }
-        sb.append(hfs.getName()).append(' ').append(hfs.getTypeString());
+        sb.append(hfs.getName().toLowerCase());
+        sb.append(' ').append(hfs.getTypeString());
       }
       sb.append(")\n");
     }
     sb.append(getStorageInfo());
+    LOG.info("Create table command : " + sb);
     return sb.toString();
   }
 
@@ -164,18 +168,26 @@ public final class HCatalogTestUtils {
     String tableName, List<HCatFieldSchema> tableCols,
     List<HCatFieldSchema> partKeys)
     throws Exception {
+
     String databaseName = dbName == null
       ? SqoopHCatUtilities.DEFHCATDB : dbName;
+    LOG.info("Dropping HCatalog table if it exists " + databaseName
+      + '.' + tableName);
     String dropCmd = getDropTableCmd(databaseName, tableName);
+
     try {
-      utils.launchHCatCli(dropCmd);
-    } catch (IOException ioe) {
+      utils.launchHCatCli(false, dropCmd);
+    } catch (Exception e) {
+      LOG.debug("Drop hcatalog table exception : " + e);
       LOG.info("Unable to drop table." + dbName + "."
         + tableName + ".   Assuming it did not exist");
     }
+    LOG.info("Creating HCatalog table if it exists " + databaseName
+      + '.' + tableName);
     String createCmd = getHCatCreateTableCmd(databaseName, tableName,
       tableCols, partKeys);
-    utils.launchHCatCli(createCmd);
+    utils.launchHCatCli(false, createCmd);
+    LOG.info("Created HCatalog table " + dbName + "." + tableName);
   }
 
   /**
@@ -359,6 +371,15 @@ public final class HCatalogTestUtils {
   };
 
   /**
+   * An enumeration type to hold the creation mode of the HCatalog table.
+   */
+  public enum CreateMode {
+    NO_CREATION,
+      CREATE,
+      CREATE_AND_LOAD,
+  };
+
+  /**
    * When generating data for export tests, each column is generated according
    * to a ColumnGenerator.
    */
@@ -415,8 +436,8 @@ public final class HCatalogTestUtils {
 
   public static ColumnGenerator colGenerator(final String name,
     final String dbType, final int sqlType,
-    final HCatFieldSchema.Type hCatType, final Object exportValue,
-    final Object verifyValue, final KeyType keyType) {
+    final HCatFieldSchema.Type hCatType, final Object hCatValue,
+    final Object dbValue, final KeyType keyType) {
     return new ColumnGenerator() {
 
       @Override
@@ -426,12 +447,12 @@ public final class HCatalogTestUtils {
 
       @Override
       public Object getDBValue(int rowNum) {
-        return verifyValue;
+        return dbValue;
       }
 
       @Override
       public Object getHCatValue(int rowNum) {
-        return exportValue;
+        return hCatValue;
       }
 
       @Override
@@ -643,7 +664,7 @@ public final class HCatalogTestUtils {
     }
   }
 
-  public HCatSchema createHCatTable(boolean generateOnly, int count,
+  public HCatSchema createHCatTable(CreateMode mode, int count,
     String table, ColumnGenerator... extraCols)
     throws Exception {
     HCatSchema hCatTblSchema = generateHCatTableSchema(extraCols);
@@ -652,15 +673,19 @@ public final class HCatalogTestUtils {
     for (HCatFieldSchema hfs : hCatPartSchema.getFields()) {
       hCatFullSchema.append(hfs);
     }
-    createHCatTableUsingSchema(null, table,
-      hCatTblSchema.getFields(), hCatPartSchema.getFields());
-    if (!generateOnly) {
-      HCatSchema hCatLoadSchema = new HCatSchema(hCatTblSchema.getFields());
-      HCatSchema dynPartSchema = generateHCatDynamicPartitionSchema(extraCols);
-      for (HCatFieldSchema hfs : dynPartSchema.getFields()) {
-        hCatLoadSchema.append(hfs);
+    if (mode != CreateMode.NO_CREATION) {
+
+      createHCatTableUsingSchema(null, table,
+        hCatTblSchema.getFields(), hCatPartSchema.getFields());
+      if (mode == CreateMode.CREATE_AND_LOAD) {
+        HCatSchema hCatLoadSchema = new HCatSchema(hCatTblSchema.getFields());
+        HCatSchema dynPartSchema =
+          generateHCatDynamicPartitionSchema(extraCols);
+        for (HCatFieldSchema hfs : dynPartSchema.getFields()) {
+          hCatLoadSchema.append(hfs);
+        }
+        loadHCatTable(hCatLoadSchema, table, count, extraCols);
       }
-      loadHCatTable(hCatLoadSchema, table, count, extraCols);
     }
     return hCatFullSchema;
   }

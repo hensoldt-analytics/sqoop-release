@@ -25,12 +25,16 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.ArrayWritable;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.DefaultStringifier;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hcatalog.common.HCatConstants;
 import org.apache.hcatalog.common.HCatUtil;
@@ -39,19 +43,23 @@ import org.apache.hcatalog.data.HCatRecord;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.hcatalog.data.schema.HCatSchema;
 import org.apache.hcatalog.mapreduce.InputJobInfo;
+import org.apache.hcatalog.mapreduce.StorerInfo;
 import org.apache.sqoop.lib.SqoopRecord;
 import org.apache.sqoop.mapreduce.ImportJobBase;
 import org.apache.sqoop.mapreduce.SqoopMapper;
 
 import com.cloudera.sqoop.lib.BlobRef;
 import com.cloudera.sqoop.lib.ClobRef;
+import com.cloudera.sqoop.lib.DelimiterSet;
+import com.cloudera.sqoop.lib.FieldFormatter;
 import com.cloudera.sqoop.lib.LargeObjectLoader;
 
 /**
  * A mapper for HCatalog import.
  */
 public class SqoopHCatImportMapper extends
-    SqoopMapper<WritableComparable, SqoopRecord, WritableComparable, HCatRecord> {
+  SqoopMapper<WritableComparable, SqoopRecord,
+  WritableComparable, HCatRecord> {
   public static final Log LOG = LogFactory
     .getLog(SqoopHCatImportMapper.class.getName());
   public static final String DEBUG_HCAT_IMPORT_MAPPER_PROP =
@@ -65,6 +73,12 @@ public class SqoopHCatImportMapper extends
   private LargeObjectLoader lobLoader;
   private HCatSchema partitionSchema = null;
   private HCatSchema dataColsSchema = null;
+  private String stringDelimiterReplacements = null;
+  private ArrayWritable delimCharsArray;
+  private String hiveDelimsReplacement;
+  private boolean doHiveDelimsReplacement = false;
+  private DelimiterSet hiveDelimiters;
+  private String staticPartitionKey;
   @Override
   protected void setup(Context context)
     throws IOException, InterruptedException {
@@ -75,6 +89,25 @@ public class SqoopHCatImportMapper extends
     dataColsSchema = jobInfo.getTableInfo().getDataColumns();
     partitionSchema =
       jobInfo.getTableInfo().getPartitionColumns();
+    StringBuilder storerInfoStr = new StringBuilder(1024);
+    StorerInfo storerInfo = jobInfo.getTableInfo().getStorerInfo();
+    storerInfoStr.append("HCatalog Storer Info : ")
+      .append("\n\tHandler = ").append(storerInfo.getStorageHandlerClass())
+      .append("\n\tInput format class = ").append(storerInfo.getIfClass())
+      .append("\n\tOutput format class = ").append(storerInfo.getOfClass())
+      .append("\n\tSerde class = ").append(storerInfo.getSerdeClass());
+    Properties storerProperties = storerInfo.getProperties();
+    if (!storerProperties.isEmpty()) {
+      storerInfoStr.append("\nStorer properties ");
+      for (Map.Entry<Object, Object> entry : storerProperties.entrySet()) {
+        String key = (String) entry.getKey();
+        Object val = entry.getValue();
+        storerInfoStr.append("\n\t").append(key).append('=').append(val);
+      }
+    }
+    storerInfoStr.append("\n");
+    LOG.info(storerInfoStr);
+
     hCatFullTableSchema = new HCatSchema(dataColsSchema.getFields());
     for (HCatFieldSchema hfs : partitionSchema.getFields()) {
       hCatFullTableSchema.append(hfs);
@@ -87,6 +120,28 @@ public class SqoopHCatImportMapper extends
       ImportJobBase.PROPERTY_BIGDECIMAL_FORMAT_DEFAULT);
     debugHCatImportMapper = conf.getBoolean(
       DEBUG_HCAT_IMPORT_MAPPER_PROP, false);
+    SqoopHCatUtilities.IntArrayWritable delimArray =
+      DefaultStringifier.load(conf,
+        SqoopHCatUtilities.HIVE_DELIMITERS_TO_REPLACE_PROP,
+        SqoopHCatUtilities.IntArrayWritable.class);
+    IntWritable[] delimChars = (IntWritable[]) delimArray.toArray();
+    hiveDelimiters = new DelimiterSet(
+      (char) delimChars[0].get(), (char) delimChars[1].get(),
+      (char) delimChars[2].get(), (char) delimChars[3].get(),
+      delimChars[4].get() == 1 ? true : false);
+    hiveDelimsReplacement =
+      conf.get(SqoopHCatUtilities.HIVE_DELIMITERS_REPLACEMENT_PROP);
+    if (hiveDelimsReplacement == null) {
+      hiveDelimsReplacement = "";
+    }
+    doHiveDelimsReplacement = Boolean.valueOf(conf.get(
+      SqoopHCatUtilities.HIVE_DELIMITERS_REPLACEMENT_ENABLED_PROP));
+    LOG.debug("Hive delims replacement enabled : " + doHiveDelimsReplacement);
+    LOG.debug("Hive Delimiters : " + hiveDelimiters.toString());
+    LOG.debug("Hive delimiters replacement : " + hiveDelimsReplacement);
+    staticPartitionKey =
+      conf.get(SqoopHCatUtilities.HCAT_STATIC_PARTITION_KEY_PROP);
+    LOG.debug("Static partition key used : " + staticPartitionKey);
 
   }
 
@@ -120,7 +175,11 @@ public class SqoopHCatImportMapper extends
     for (Map.Entry<String, Object> entry : fieldMap.entrySet()) {
       String key = entry.getKey();
       Object val = entry.getValue();
-      HCatFieldSchema hfs = hCatFullTableSchema.get(key.toLowerCase());
+      String hfn = key.toLowerCase();
+      if (staticPartitionKey != null && staticPartitionKey.equals(hfn)) {
+        continue;
+      }
+      HCatFieldSchema hfs = hCatFullTableSchema.get(hfn);
       if (debugHCatImportMapper) {
         LOG.debug("SqoopRecordVal: field = " + key + " Val " + val
           + " of type " + (val == null ? null : val.getClass().getName())
@@ -129,12 +188,12 @@ public class SqoopHCatImportMapper extends
       Object hCatVal = toHCat(val, hfs.getType(), hfs.getTypeString());
       // This needs to be checked.
       // if (hCatVal == null
-      // && partitionSchema.getFieldNames().contains(key.toLowerCase())) {
+      // && partitionSchema.getFieldNames().contains(key)) {
       // throw new IOException("Dynamic partition keys cannot be null."
       // + "  Please make sure that the column " + key
       // + " is declared as not null in the database");
       // }
-      result.set(key.toLowerCase(), hCatFullTableSchema, hCatVal);
+      result.set(hfn, hCatFullTableSchema, hCatVal);
     }
 
     return result;
@@ -150,15 +209,22 @@ public class SqoopHCatImportMapper extends
     Object retVal = null;
 
     if (val instanceof Number) {
-      retVal = convertFromNumberType(val, hfsType);
+      retVal = convertNumberTypes(val, hfsType);
     } else if (val instanceof Boolean) {
-      retVal = convertFromBooleanType(val, hfsType);
+      retVal = convertBooleanTypes(val, hfsType);
     } else if (val instanceof String) {
       if (hfsType == HCatFieldSchema.Type.STRING) {
-        retVal = val;
+        String str = (String) val;
+        if (doHiveDelimsReplacement) {
+          retVal = FieldFormatter
+            .hiveStringReplaceDelims(str, hiveDelimsReplacement,
+                hiveDelimiters);
+        } else {
+          retVal = str;
+        }
       }
     } else if (val instanceof java.util.Date) {
-      retVal = convertFromDateTimeTypes(val, hfsType);
+      retVal = converDateTypes(val, hfsType);
     } else if (val instanceof BytesWritable) {
       if (hfsType == HCatFieldSchema.Type.BINARY) {
         BytesWritable bw = (BytesWritable) val;
@@ -182,14 +248,14 @@ public class SqoopHCatImportMapper extends
         + val.getClass().getName() + " are not suported");
     }
     if (retVal == null) {
-      throw new UnsupportedOperationException("Objects of type "
+      LOG.error("Objects of type "
         + val.getClass().getName() + " can not be mapped to HCatalog type "
         + hCatTypeString);
     }
     return retVal;
   }
 
-  private Object convertFromDateTimeTypes(Object val,
+  private Object converDateTypes(Object val,
     HCatFieldSchema.Type hfsType) {
     if (val instanceof java.sql.Date) {
       if (hfsType == HCatFieldSchema.Type.BIGINT) {
@@ -213,7 +279,7 @@ public class SqoopHCatImportMapper extends
     return null;
   }
 
-  private Object convertFromBooleanType(Object val,
+  private Object convertBooleanTypes(Object val,
     HCatFieldSchema.Type hfsType) {
     Boolean b = (Boolean) val;
     if (hfsType == HCatFieldSchema.Type.BOOLEAN) {
@@ -230,11 +296,13 @@ public class SqoopHCatImportMapper extends
       return (float) (b ? 1 : 0);
     } else if (hfsType == HCatFieldSchema.Type.DOUBLE) {
       return (double) (b ? 1 : 0);
+    } else if (hfsType == HCatFieldSchema.Type.STRING) {
+      return val.toString();
     }
     return null;
   }
 
-  private Object convertFromNumberType(Object val,
+  private Object convertNumberTypes(Object val,
     HCatFieldSchema.Type hfsType) {
     if (!(val instanceof Number)) {
       return null;
@@ -262,6 +330,8 @@ public class SqoopHCatImportMapper extends
       return n.doubleValue();
     } else if (hfsType == HCatFieldSchema.Type.BOOLEAN) {
       return n.byteValue() == 0 ? Boolean.FALSE : Boolean.TRUE;
+    } else if (hfsType == HCatFieldSchema.Type.STRING) {
+      return n.toString();
     }
     return null;
   }

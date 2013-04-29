@@ -94,7 +94,7 @@ public class ExportJobBase extends JobBase {
       final Class<? extends OutputFormat> outputFormatClass) {
     super(ctxt.getOptions(), mapperClass, inputFormatClass, outputFormatClass);
     this.context = ctxt;
-    this.isHCatJob = options.getHCatTable() != null;
+    this.isHCatJob = options.getHCatTableName() != null;
   }
 
   /**
@@ -379,7 +379,7 @@ public class ExportJobBase extends JobBase {
         LOG.debug("Configuring HCatalog for export job");
         SqoopHCatUtilities hCatUtils = SqoopHCatUtilities.instance();
         hCatUtils.configureHCat(options, job, cmgr, tableName,
-          options.getHCatTable(), job.getConfiguration());
+          job.getConfiguration());
       }
       configureInputFormat(job, tableName, tableClassName, null);
       configureOutputFormat(job, tableName, tableClassName);

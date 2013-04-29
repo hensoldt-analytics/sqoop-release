@@ -92,7 +92,7 @@ public class DataDrivenImportJob extends ImportJobBase {
 
   @Override
   protected Class<? extends Mapper> getMapperClass() {
-    if (options.getHCatTable() != null) {
+    if (options.getHCatTableName() != null) {
       return SqoopHCatUtilities.getImportMapperClass();
     }
     if (options.getFileLayout() == SqoopOptions.FileLayout.TextFile) {

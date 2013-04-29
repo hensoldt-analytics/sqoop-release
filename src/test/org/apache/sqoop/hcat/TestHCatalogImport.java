@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.cloudera.sqoop.hcat;
+package org.apache.sqoop.hcat;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -41,21 +41,26 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hcatalog.data.HCatRecord;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.hcatalog.data.schema.HCatSchema;
+import org.apache.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
+import org.apache.sqoop.hcat.HCatalogTestUtils.CreateMode;
+import org.apache.sqoop.hcat.HCatalogTestUtils.KeyType;
 import org.apache.sqoop.mapreduce.hcat.SqoopHCatImportMapper;
 import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 import org.junit.Before;
 
-import com.cloudera.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
-import com.cloudera.sqoop.hcat.HCatalogTestUtils.KeyType;
+import com.cloudera.sqoop.Sqoop;
+import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.testutil.CommonArgs;
 import com.cloudera.sqoop.testutil.ImportJobTestCase;
+import com.cloudera.sqoop.tool.ImportTool;
+import com.cloudera.sqoop.tool.SqoopTool;
 
 /**
  * Test that we can export HCatalog tables into databases.
  */
-public class HCatalogImportManualTest extends ImportJobTestCase {
+public class TestHCatalogImport extends ImportJobTestCase {
   private static final Log LOG =
-    LogFactory.getLog(HCatalogImportManualTest.class);
+    LogFactory.getLog(TestHCatalogImport.class);
   private final HCatalogTestUtils utils = HCatalogTestUtils.instance();
   private List<String> extraTestArgs = null;
   private List<String> configParams = null;
@@ -224,12 +229,39 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
     }
   }
 
+  protected void runImport(SqoopTool tool, String[] argv) throws IOException {
+    // run the tool through the normal entry-point.
+    int ret;
+    try {
+      Configuration conf = getConf();
+      SqoopOptions opts = getSqoopOptions(conf);
+      Sqoop sqoop = new Sqoop(tool, conf, opts);
+      ret = Sqoop.runSqoop(sqoop, argv);
+    } catch (Exception e) {
+      LOG.error("Got exception running import: " + e.toString());
+      e.printStackTrace();
+      ret = 1;
+    }
+    if (0 != ret) {
+      throw new IOException("Import failure; return status " + ret);
+    }
+  }
 
   private void runHCatImport(List<String> addlArgsArray,
     int totalRecords, String table, ColumnGenerator[] cols,
     String[] cNames) throws Exception {
+    runHCatImport(addlArgsArray, totalRecords, table, cols, cNames, false);
+  }
+
+  private void runHCatImport(List<String> addlArgsArray,
+    int totalRecords, String table, ColumnGenerator[] cols,
+    String[] cNames, boolean dontCreate) throws Exception {
+    CreateMode mode = CreateMode.CREATE;
+    if (dontCreate) {
+      mode = CreateMode.NO_CREATION;
+    }
     HCatSchema tblSchema =
-      utils.createHCatTable(true, totalRecords, table, cols);
+      utils.createHCatTable(mode, totalRecords, table, cols);
     utils.createSqlTable(getConnection(), false, totalRecords, table, cols);
     Map<String, String> addlArgsMap = utils.getAddlTestArgs();
     String[] argv = {};
@@ -262,7 +294,7 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
     String[] importArgs = getArgv(true, colNames, new Configuration());
     LOG.debug("Import args = " + Arrays.toString(importArgs));
     SqoopHCatUtilities.instance().setConfigured(false);
-    runImport(importArgs);
+    runImport(new ImportTool(), importArgs);
     List<HCatRecord> recs = utils.readHCatRecords(null, table, null);
     LOG.debug("HCat records ");
     LOG.debug(utils.hCatRecordDump(recs, tblSchema));
@@ -367,7 +399,7 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
     };
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--map-column-hive");
-    addlArgsArray.add("col0=bigint,col1=bigint,col2=bigint");
+    addlArgsArray.add("COL0=bigint,COL1=bigint,COL2=bigint");
     setExtraArgs(addlArgsArray);
     runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
   }
@@ -539,6 +571,102 @@ public class HCatalogImportManualTest extends ImportJobTestCase {
     addlArgsArray.add("1");
     setExtraArgs(addlArgsArray);
     utils.setStorageInfo(HCatalogTestUtils.STORED_AS_TEXT);
-    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);   
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testTableCreation() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "1", "1", KeyType.STATIC_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "2", "2", KeyType.DYNAMIC_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--create-hcatalog-table");
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null, true);
+  }
+
+  public void testTableCreationWithPartition() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "1", "1", KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "2", "2", KeyType.STATIC_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-partition-key");
+    addlArgsArray.add("col1");
+    addlArgsArray.add("--hive-partition-value");
+    addlArgsArray.add("2");
+    addlArgsArray.add("--create-hcatalog-table");
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null, true);
+  }
+
+  public void testTableCreationWithStorageStanza() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "1", "1", KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "2", "2", KeyType.STATIC_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-partition-key");
+    addlArgsArray.add("col1");
+    addlArgsArray.add("--hive-partition-value");
+    addlArgsArray.add("2");
+    addlArgsArray.add("--create-hcatalog-table");
+    addlArgsArray.add("--hcatalog-storage-stanza");
+    addlArgsArray.add(HCatalogTestUtils.STORED_AS_TEXT);
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null, true);
+  }
+
+  public void testHiveDropDelims() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "Test", "\u0001\n\rTest", KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "Test2", "\u0001\r\nTest2", KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-drop-import-delims");
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testHiveDelimsReplacement() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "^^^Test", "\u0001\n\rTest", KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING,
+        "^^^Test2", "\u0001\r\nTest2", KeyType.NOT_A_KEY),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    addlArgsArray.add("--hive-delims-replacement");
+    addlArgsArray.add("^");
+    setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
   }
 }

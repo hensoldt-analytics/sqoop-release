@@ -310,7 +310,7 @@ public class ExportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
           "Export requires a --table or a --call argument."
           + HELP_STR);
     } else if (options.getExportDir() == null
-      && options.getHCatTable() == null) {
+      && options.getHCatTableName() == null) {
       throw new InvalidOptionsException(
           "Export requires an --export-dir argument or "
           + "--hcatalog-table argument."

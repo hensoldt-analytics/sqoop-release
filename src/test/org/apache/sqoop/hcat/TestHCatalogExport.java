@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.cloudera.sqoop.hcat;
+package org.apache.sqoop.hcat;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -35,19 +35,20 @@ import java.util.TimeZone;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
+import org.apache.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
+import org.apache.sqoop.hcat.HCatalogTestUtils.CreateMode;
+import org.apache.sqoop.hcat.HCatalogTestUtils.KeyType;
 import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 import org.junit.Before;
 
-import com.cloudera.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
-import com.cloudera.sqoop.hcat.HCatalogTestUtils.KeyType;
 import com.cloudera.sqoop.testutil.ExportJobTestCase;
 
 /**
  * Test that we can export HCatalog tables into databases.
  */
-public class HCatalogExportManualTest extends ExportJobTestCase {
+public class TestHCatalogExport extends ExportJobTestCase {
   private static final Log LOG =
-    LogFactory.getLog(HCatalogExportManualTest.class);
+    LogFactory.getLog(TestHCatalogExport.class);
   private HCatalogTestUtils utils = HCatalogTestUtils.instance();
   @Before
   @Override
@@ -104,9 +105,11 @@ public class HCatalogExportManualTest extends ExportJobTestCase {
   private void runHCatExport(List<String> addlArgsArray,
     final int totalRecords, String table,
     ColumnGenerator[] cols) throws Exception {
-    utils.createHCatTable(false, totalRecords, table, cols);
+    utils.createHCatTable(CreateMode.CREATE_AND_LOAD,
+      totalRecords, table, cols);
     utils.createSqlTable(getConnection(), true, totalRecords, table, cols);
     Map<String, String> addlArgsMap = utils.getAddlTestArgs();
+    addlArgsArray.add("--verbose");
     addlArgsArray.add("-m");
     addlArgsArray.add("1");
     addlArgsArray.add("--hcatalog-table");
@@ -229,7 +232,7 @@ public class HCatalogExportManualTest extends ExportJobTestCase {
     };
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--map-column-hive");
-    addlArgsArray.add("col0=bigint,col1=bigint,col2=bigint");
+    addlArgsArray.add("COL0=bigint,COL1=bigint,COL2=bigint");
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
   }
 

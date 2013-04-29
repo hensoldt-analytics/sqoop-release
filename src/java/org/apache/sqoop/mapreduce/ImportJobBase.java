@@ -82,7 +82,7 @@ public class ImportJobBase extends JobBase {
       final ImportJobContext context) {
     super(opts, mapperClass, inputFormatClass, outputFormatClass);
     this.context = context;
-    isHCatJob = options.getHCatTable() != null;
+    isHCatJob = options.getHCatTableName() != null;
   }
 
   /**
@@ -97,8 +97,7 @@ public class ImportJobBase extends JobBase {
     if (isHCatJob) {
       LOG.debug("Configuring output format for HCatalog  import job");
       SqoopHCatUtilities.configureImportOutputFormat(options, job,
-        getContext().getConnManager(), tableName, options.getHCatTable(),
-        job.getConfiguration());
+        getContext().getConnManager(), tableName, job.getConfiguration());
       return;
     }
 

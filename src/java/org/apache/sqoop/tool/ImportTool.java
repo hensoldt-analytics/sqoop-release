@@ -654,6 +654,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
     toolOptions.addUniqueOptions(getHiveOptions(true));
     toolOptions.addUniqueOptions(getHBaseOptions());
     toolOptions.addUniqueOptions(getHCatalogOptions());
+    toolOptions.addUniqueOptions(getHCatImportOnlyOptions());
 
     // get common codegen opts.
     RelatedOptions codeGenOpts = getCodeGenOpts(allTables);
@@ -895,7 +896,8 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
       throw new InvalidOptionsException("Validation is not supported for "
         + "incremental imports but single table only.");
     } else if ((options.getTargetDir() != null
-      || options.getWarehouseDir() != null) && options.getHCatTable() != null) {
+      || options.getWarehouseDir() != null)
+      && options.getHCatTableName() != null) {
       throw new InvalidOptionsException("--hcatalog-table cannot be used "
         + " --warehouse-dir or --target-dir options");
      }

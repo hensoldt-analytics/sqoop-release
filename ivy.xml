@@ -38,14 +38,14 @@ under the License.
       description="artifacts needed to compile/test the application"/>
     <conf name="hbase" visibility="private" />
     <conf name="hcatalog" visibility="private" />
-    <conf name="hadoop23"
-      visibility="private" extends="common,runtime,hbase,hcatalog" />
-    <conf name="hadoop20"
-      visibility="private" extends="common,runtime,hbase,hcatalog" />
-    <conf name="hadoop100"
-      visibility="private" extends="common,runtime,hbase,hcatalog" />
-    <conf name="hadoop200"
-      visibility="private" extends="common,runtime,hbase,hcatalog" />
+    <conf name="hadoop23" visibility="private"
+      extends="common,runtime,hbase,hcatalog" />
+    <conf name="hadoop20" visibility="private"
+      extends="common,runtime,hbase,hcatalog" />
+    <conf name="hadoop100" visibility="private"
+      extends="common,runtime,hbase,hcatalog" />
+    <conf name="hadoop200" visibility="private"
+      extends="common,runtime,hbase,hcatalog" />
 
     <conf name="test" visibility="private" extends="common,runtime"/>
     <conf name="hadoop23test" visibility="private" extends="test,hadoop23" />
@@ -180,20 +180,17 @@ under the License.
     <dependency org="org.apache.hcatalog" name="hcatalog-core"
       rev="${hcatalog.version}" conf="hcatalog->default">
       <artifact name="hcatalog-core" type="jar"/>
-      <exclude org="org.apache.hive" module="hive-builtins"/>
-      <exclude org="org.apache.hive" module="hive-cli"/>
-      <exclude org="org.apache.hive" module="hive-shims"/>
-
-      <exclude org="jline" module="jline"/>
-      <exclude org="javax.jdo" module="jdo2-api"/>
-      <exclude org="org.hamcrest" module="hamcrest-core"/>
-
-      <exclude org="org.datanucleus" module="datanucleus-connectionpool"/>
-      <exclude org="org.datanucleus" module="datanucleus-core"/>
-      <exclude org="org.datanucleus" module="datanucleus-enhancer"/>
-      <exclude org="org.datanucleus" module="datanucleus-rdbms"/>
     </dependency>
 
+    <dependency org="javax.jdo" name="jdo2-api"
+      rev="2.3-eb" conf="hcatalog->default">
+      <artifact name="jdo2-api" type="jar"/>
+    </dependency>
+
+    <dependency org="com.google.guava" name="guava"
+      rev="14.0.1" conf="hcatalog->default">
+      <artifact name="guava" type="jar"/>
+    </dependency>
 
     <exclude org="org.apache.hadoop" module="avro"/>
     <exclude org="commons-daemon" module="commons-daemon" />

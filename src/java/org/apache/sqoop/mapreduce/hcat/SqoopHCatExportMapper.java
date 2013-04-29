@@ -52,7 +52,8 @@ import org.apache.sqoop.mapreduce.ExportJobBase;
  */
 public class SqoopHCatExportMapper
     extends
-    AutoProgressMapper<WritableComparable, HCatRecord, SqoopRecord, WritableComparable> {
+  AutoProgressMapper<WritableComparable, HCatRecord,
+  SqoopRecord, WritableComparable> {
   public static final Log LOG = LogFactory
     .getLog(SqoopHCatExportMapper.class.getName());
   private InputJobInfo jobInfo;
@@ -73,6 +74,7 @@ public class SqoopHCatExportMapper
   private static final String LONG_TYPE = "Long";
   private static final String BOOLEAN_TYPE = "Boolean";
   private static final String STRING_TYPE = "String";
+
 
   private static final String BYTESWRITABLE =
     "org.apache.hadoop.io.BytesWritable";
@@ -124,6 +126,7 @@ public class SqoopHCatExportMapper
       hCatFullTableSchema.append(hfs);
     }
     hCatSchemaFields = hCatFullTableSchema.getFields();
+
   }
 
   @Override
@@ -140,11 +143,12 @@ public class SqoopHCatExportMapper
       String colName = e.getKey().toString();
       String javaColType = e.getValue().toString();
       int sqlType = ((IntWritable) colTypesSql.get(e.getKey())).get();
+      String hfn = colName.toLowerCase();
       HCatFieldSchema field =
-        hCatFullTableSchema.get(colName.toLowerCase());
+        hCatFullTableSchema.get(hfn);
       HCatFieldSchema.Type fieldType = field.getType();
       Object hCatVal =
-        hcr.get(colName.toLowerCase(), hCatFullTableSchema);
+        hcr.get(hfn, hCatFullTableSchema);
       String hCatTypeString = field.getTypeString();
       Object sqlVal = convertToSqoop(hCatVal, fieldType,
         javaColType, hCatTypeString);
@@ -163,7 +167,7 @@ public class SqoopHCatExportMapper
 
   private Object convertToSqoop(Object val,
     HCatFieldSchema.Type fieldType, String javaColType,
-    String hCatTypeString) {
+    String hCatTypeString) throws IOException {
 
     if (val == null) {
       return null;
@@ -175,13 +179,13 @@ public class SqoopHCatExportMapper
       case SMALLINT:
       case FLOAT:
       case DOUBLE:
-        val = convertToNumberTypes(val, javaColType);
+        val = convertNumberTypes(val, javaColType);
         if (val != null) {
           return val;
         }
         break;
       case BOOLEAN:
-        val = convertToBooleanTypes(val, javaColType);
+        val = convertBooleanTypes(val, javaColType);
         if (val != null) {
           return val;
         }
@@ -194,20 +198,20 @@ public class SqoopHCatExportMapper
         } else if (javaColType.equals(TIMESTAMP_TYPE)) {
           return new Timestamp((Long) val);
         } else {
-          val = convertToNumberTypes(val, javaColType);
+          val = convertNumberTypes(val, javaColType);
           if (val != null) {
             return val;
           }
         }
         break;
       case STRING:
-        val = convertToStringTypes(val, javaColType);
+        val = convertStringTypes(val, javaColType);
         if (val != null) {
           return val;
         }
         break;
       case BINARY:
-        val = convertToBinaryTypes(val, javaColType);
+        val = convertBinaryTypes(val, javaColType);
         if (val != null) {
           return val;
         }
@@ -216,15 +220,16 @@ public class SqoopHCatExportMapper
       case MAP:
       case STRUCT:
       default:
-        throw new IllegalArgumentException("Cannot convert HCatalog type "
+        throw new IOException("Cannot convert HCatalog type "
           + fieldType);
     }
-    throw new IllegalArgumentException("Cannot convert HCatalog object of "
+    LOG.error("Cannot convert HCatalog object of "
       + " type " + hCatTypeString + " to java object type "
       + javaColType);
+    return null;
   }
 
-  private Object convertToBinaryTypes(Object val, String javaColType) {
+  private Object convertBinaryTypes(Object val, String javaColType) {
     byte[] bb = (byte[]) val;
     if (javaColType.equals(BYTESWRITABLE)) {
       BytesWritable bw = new BytesWritable();
@@ -234,23 +239,66 @@ public class SqoopHCatExportMapper
     return null;
   }
 
-  private Object convertToStringTypes(Object val, String javaColType) {
+  private Object convertStringTypes(Object val, String javaColType) {
     String valStr = val.toString();
     if (javaColType.equals(BIG_DECIMAL_TYPE)) {
       return new BigDecimal(valStr);
-    } else if (javaColType.equals(DATE_TYPE)) {
-      return Date.valueOf(valStr);
-    } else if (javaColType.equals(TIME_TYPE)) {
-      return Time.valueOf(valStr);
-    } else if (javaColType.equals(TIMESTAMP_TYPE)) {
-      return Timestamp.valueOf(valStr);
+    } else if (javaColType.equals(DATE_TYPE)
+      || javaColType.equals(TIME_TYPE)
+      || javaColType.equals(TIMESTAMP_TYPE)) {
+      // Oracle expects timestamps for Date also by default based on version
+      // Just allow all date types to be assignment compatible
+      if (valStr.length() == 10) { // Date in yyyy-mm-dd format
+        Date d = Date.valueOf(valStr);
+        if (javaColType.equals(DATE_TYPE)) {
+          return d;
+        } else if (javaColType.equals(TIME_TYPE)) {
+          return new Time(d.getTime());
+        } else if (javaColType.equals(TIMESTAMP_TYPE)) {
+          return new Timestamp(d.getTime());
+        }
+      } else if (valStr.length() == 8) { // time in hh:mm:ss
+        Time t = Time.valueOf(valStr);
+        if (javaColType.equals(DATE_TYPE)) {
+          return new Date(t.getTime());
+        } else if (javaColType.equals(TIME_TYPE)) {
+          return t;
+        } else if (javaColType.equals(TIMESTAMP_TYPE)) {
+          return new Timestamp(t.getTime());
+        }
+      } else if (valStr.length() == 19) { // timestamp in yyyy-mm-dd hh:ss:mm
+        Timestamp ts = Timestamp.valueOf(valStr);
+        if (javaColType.equals(DATE_TYPE)) {
+          return new Date(ts.getTime());
+        } else if (javaColType.equals(TIME_TYPE)) {
+          return new Time(ts.getTime());
+        } else if (javaColType.equals(TIMESTAMP_TYPE)) {
+          return ts;
+        }
+      } else {
+        return null;
+      }
     } else if (javaColType.equals(STRING_TYPE)) {
       return valStr;
+    } else if (javaColType.equals(BOOLEAN_TYPE)) {
+      return Boolean.valueOf(valStr);
+    } else if (javaColType.equals(BYTE_TYPE)) {
+      return Byte.parseByte(valStr);
+    } else if (javaColType.equals(SHORT_TYPE)) {
+      return Short.parseShort(valStr);
+    } else if (javaColType.equals(INTEGER_TYPE)) {
+      return Integer.parseInt(valStr);
+    } else if (javaColType.equals(LONG_TYPE)) {
+      return Long.parseLong(valStr);
+    } else if (javaColType.equals(FLOAT_TYPE)) {
+      return Float.parseFloat(valStr);
+    } else if (javaColType.equals(DOUBLE_TYPE)) {
+      return Double.parseDouble(valStr);
     }
     return null;
   }
 
-  private Object convertToBooleanTypes(Object val, String javaColType) {
+  private Object convertBooleanTypes(Object val, String javaColType) {
     Boolean b = (Boolean) val;
     if (javaColType.equals(BOOLEAN_TYPE)) {
       return b;
@@ -268,11 +316,13 @@ public class SqoopHCatExportMapper
       return (double) (b ? 1 : 0);
     } else if (javaColType.equals(BIG_DECIMAL_TYPE)) {
       return new BigDecimal(b ? 1 : 0);
+    } else if (javaColType.equals(STRING_TYPE)) {
+      return val.toString();
     }
     return null;
   }
 
-  private Object convertToNumberTypes(Object val, String javaColType) {
+  private Object convertNumberTypes(Object val, String javaColType) {
     Number n = (Number) val;
     if (javaColType.equals(BYTE_TYPE)) {
       return n.byteValue();
@@ -290,6 +340,8 @@ public class SqoopHCatExportMapper
       return new BigDecimal(n.doubleValue());
     } else if (javaColType.equals(BOOLEAN_TYPE)) {
       return n.byteValue() == 0 ? Boolean.FALSE : Boolean.TRUE;
+    } else if (javaColType.equals(STRING_TYPE)) {
+      return n.toString();
     }
     return null;
   }

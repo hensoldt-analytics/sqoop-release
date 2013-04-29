@@ -144,7 +144,14 @@ public class SqoopOptions implements Cloneable {
   private String hiveDelimsReplacement;
   @StoredAsProperty("hive.partition.key") private String hivePartitionKey;
   @StoredAsProperty("hive.partition.value") private String hivePartitionValue;
-  @StoredAsProperty("hcatalog.table") private String hCatTable;
+  @StoredAsProperty("hcatalog.table.name")
+  private String hCatTableName;
+  @StoredAsProperty("hcatalog.database.name")
+  private String hCatDatabaseName;
+  @StoredAsProperty("hcatalog.create.table")
+  private boolean hCatCreateTable;
+  @StoredAsProperty("hcatalog.storage.stanza")
+  private String hCatStorageStanza;
   private String hCatHome; // not serialized to metastore.
 
   // User explicit mapping of types
@@ -1233,12 +1240,36 @@ public class SqoopOptions implements Cloneable {
   }
 
   // HCatalog support
-  public void setHCatTable(String ht) {
-    this.hCatTable = ht;
+  public void setHCatTableName(String ht) {
+    this.hCatTableName = ht;
   }
 
-  public String getHCatTable() {
-    return this.hCatTable;
+  public String getHCatTableName() {
+    return this.hCatTableName;
+  }
+
+  public void setHCatDatabaseName(String hd) {
+    this.hCatDatabaseName = hd;
+  }
+
+  public String getHCatDatabaseName() {
+    return this.hCatDatabaseName;
+  }
+
+  public boolean getCreateHCatalogTable() {
+    return hCatCreateTable;
+  }
+
+  public void setCreateHCatalogTable(boolean create) {
+    this.hCatCreateTable = create;
+  }
+
+  public void setHCatStorageStanza(String stanza) {
+    this.hCatStorageStanza = stanza;
+  }
+
+  public String getHCatStorageStanza() {
+    return this.hCatStorageStanza;
   }
 
   public String getHCatHome() {

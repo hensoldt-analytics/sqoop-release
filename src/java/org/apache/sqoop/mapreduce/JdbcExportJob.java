@@ -68,8 +68,7 @@ public class JdbcExportJob extends ExportJobBase {
 
     if (isHCatJob) {
       SqoopHCatUtilities.configureExportInputFormat(options, job,
-        context.getConnManager(), tableName, options.getHCatTable(),
-        job.getConfiguration());
+        context.getConnManager(), tableName, job.getConfiguration());
       return;
     } else if (fileType == FileType.AVRO_DATA_FILE) {
       LOG.debug("Configuring for Avro export");

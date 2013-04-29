@@ -106,6 +106,11 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String CREATE_HIVE_TABLE_ARG =
       "create-hive-table";
   public static final String HCATALOG_TABLE_ARG = "hcatalog-table";
+  public static final String HCATALOG_DATABASE_ARG = "hcatalog-database";
+  public static final String CREATE_HCATALOG_TABLE_ARG =
+    "create-hcatalog-table";
+  public static final String HCATALOG_STORAGE_STANZA_ARG =
+    "hcatalog-storage-stanza";
   public static final String HCATALOG_HOME_ARG = "hcatalog-home";
   public static final String MAPREDUCE_JOB_NAME = "mapreduce-job-name";
   public static final String NUM_MAPPERS_ARG = "num-mappers";
@@ -482,8 +487,13 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     RelatedOptions hCatOptions = new RelatedOptions("HCatalog arguments");
     hCatOptions.addOption(OptionBuilder
       .hasArg()
-      .withDescription("HCatalog tablee name")
+      .withDescription("HCatalog table name")
       .withLongOpt(HCATALOG_TABLE_ARG)
+      .create());
+    hCatOptions.addOption(OptionBuilder
+      .hasArg()
+      .withDescription("HCatalog Database name")
+      .withLongOpt(HCATALOG_DATABASE_ARG)
       .create());
     hCatOptions.addOption(OptionBuilder.withArgName("dir")
       .hasArg().withDescription("Override $HIVE_HOME")
@@ -513,6 +523,23 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
 
     return hCatOptions;
   }
+
+
+  protected RelatedOptions getHCatImportOnlyOptions() {
+    RelatedOptions hCatOptions = new RelatedOptions(
+      "HCatalog import specific options");
+    hCatOptions.addOption(OptionBuilder
+      .withDescription("Create HCatalog before import")
+      .withLongOpt(CREATE_HCATALOG_TABLE_ARG)
+      .create());
+   hCatOptions.addOption(OptionBuilder
+      .hasArg()
+     .withDescription("HCatalog storage stanza for table creation")
+      .withLongOpt(HCATALOG_STORAGE_STANZA_ARG)
+      .create());
+    return hCatOptions;
+  }
+
 
   /**
    * @return options governing output format delimiters
@@ -854,7 +881,19 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
 
   protected void applyHCatOptions(CommandLine in, SqoopOptions out) {
     if (in.hasOption(HCATALOG_TABLE_ARG)) {
-      out.setHCatTable(in.getOptionValue(HCATALOG_TABLE_ARG));
+      out.setHCatTableName(in.getOptionValue(HCATALOG_TABLE_ARG));
+    }
+
+    if (in.hasOption(HCATALOG_DATABASE_ARG)) {
+      out.setHCatDatabaseName(in.getOptionValue(HCATALOG_TABLE_ARG));
+    }
+
+    if (in.hasOption(HCATALOG_STORAGE_STANZA_ARG)) {
+      out.setHCatStorageStanza(in.getOptionValue(HCATALOG_STORAGE_STANZA_ARG));
+    }
+
+    if (in.hasOption(CREATE_HCATALOG_TABLE_ARG)) {
+      out.setCreateHCatalogTable(true);
     }
 
     if (in.hasOption(HCATALOG_HOME_ARG)) {
@@ -1085,7 +1124,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     }
 
     // Make sure that one of hCatalog or hive jobs are used
-    String hCatTable = options.getHCatTable();
+    String hCatTable = options.getHCatTableName();
     if (hCatTable != null && options.doHiveImport()) {
       throw new InvalidOptionsException("The " + HCATALOG_TABLE_ARG
         + " option conflicts with the " + HIVE_IMPORT_ARG
@@ -1147,23 +1186,40 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   protected void validateHCatalogOptions(SqoopOptions options)
     throws InvalidOptionsException {
     // Make sure that one of hCatalog or hive jobs are used
-    String hCatTable = options.getHCatTable();
+    String hCatTable = options.getHCatTableName();
     if (hCatTable == null) {
       if (options.getHCatHome() != null && !options.getHCatHome().
         equals(SqoopOptions.getHCatHomeDefault())) {
         LOG.warn("--hcatalog-home option will be ignored in "
           + "non-HCatalog jobs");
       }
+     if (options.getHCatDatabaseName() != null) {
+        LOG.warn("--hcatalog-database option will be ignored  "
+          + "without --hcatalog-table");
+      }
+
+      if (options.getHCatStorageStanza() != null) {
+        LOG.warn("--hcatalog-storage-stanza option will be ignored "
+          + "without --hatalog-table");
+      }
       return;
     }
 
-    if (options.explicitInputDelims()
-      || options.explicitOutputDelims()
+    if (options.explicitInputDelims()) {
+      LOG.warn("Input field/record delimiter options are not "
+        + "used in HCatalog jobs unless the format is text.   It is better "
+        + "to use --hive-import in those cases.  For text formats");
+    }
+
+    if (options.explicitOutputDelims()
       || options.getHiveDelimsReplacement() != null
       || options.doHiveDropDelims()) {
-      LOG.warn("Input and output field/record delimiter options are not "
-        + "used in HCatalog jobs.  They will be ignored");
+      LOG.warn("Output field/record delimiter options are not useful"
+        + " in HCatalog jobs for most of the output types except text based "
+        + " formats is text. It is better "
+        + "to use --hive-import in those cases.  For non text formats, ");
     }
+
     if (options.doHiveImport()) {
       throw new InvalidOptionsException("The " + HCATALOG_TABLE_ARG
         + " option conflicts with the " + HIVE_IMPORT_ARG
@@ -1188,6 +1244,11 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         + " compatible with HCatalog. Please remove the parameter"
         + "--append-mode");
     }
+    if (options.getExportDir() != null) {
+      throw new InvalidOptionsException("The " + EXPORT_PATH_ARG
+        + " option conflicts with the " + HCATALOG_TABLE_ARG
+        + " option." + HELP_STR);
+     }
   }
   protected void validateHBaseOptions(SqoopOptions options)
       throws InvalidOptionsException {
