@@ -78,8 +78,6 @@ public class SqoopHCatExportMapper
 
   private static final String BYTESWRITABLE =
     "org.apache.hadoop.io.BytesWritable";
-  public static final String DEBUG_HCAT_EXPORT_MAPPER_PROP =
-    "sqoop.debug.export.mapper";
   private static boolean debugHCatExportMapper = false;
 
   @Override
@@ -101,7 +99,7 @@ public class SqoopHCatExportMapper
         + ") is not set!");
     }
     debugHCatExportMapper = conf.getBoolean(
-      DEBUG_HCAT_EXPORT_MAPPER_PROP, false);
+      SqoopHCatUtilities.DEBUG_HCAT_EXPORT_MAPPER_PROP, false);
     try {
       Class cls = Class.forName(recordClassName, true,
         Thread.currentThread().getContextClassLoader());

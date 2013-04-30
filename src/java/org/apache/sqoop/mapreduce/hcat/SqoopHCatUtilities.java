@@ -103,7 +103,10 @@ public final class SqoopHCatUtilities {
     "sqoop.hive.delims.replacement.enabled";
   public static final String HCAT_STATIC_PARTITION_KEY_PROP =
     "sqoop.hcat.partition.key.prop";
-
+  public static final String DEBUG_HCAT_IMPORT_MAPPER_PROP =
+    "sqoop.hcat.debug.import.mapper";
+  public static final String DEBUG_HCAT_EXPORT_MAPPER_PROP =
+    "sqoop.hcat.debug.export.mapper";
   private static final String HCATCMD = Shell.WINDOWS ? "hcat.cmd" : "hcat";
   private SqoopOptions options;
   private ConnManager connManager;
@@ -344,18 +347,28 @@ public final class SqoopHCatUtilities {
         throw new IOException("Database column " + col + " not found in "
           + " hcatalog table.");
       }
+      if (hCatStaticPartitionKey != null
+        && hCatStaticPartitionKey.equals(hfn)) {
+        continue;
+      }
       outputFieldList.add(hCatFullTableSchema.get(hfn));
     }
 
     projectedSchema = new HCatSchema(outputFieldList);
 
-    LOG.info("HCatalog projected schema fields = " +
-      Arrays.toString(projectedSchema.getFieldNames().toArray()));
+    LOG.info("HCatalog projected schema fields = "
+      + Arrays.toString(projectedSchema.getFieldNames().toArray()));
 
     validateStaticPartitionKey();
     validateHCatTableFieldTypes();
-    HCatOutputFormat.setSchema(configuration, projectedSchema);
+
+    HCatOutputFormat.setSchema(configuration, hCatFullTableSchema);
+
     addJars(hCatJob, options);
+    config.setBoolean(DEBUG_HCAT_IMPORT_MAPPER_PROP,
+      Boolean.getBoolean(DEBUG_HCAT_IMPORT_MAPPER_PROP));
+    config.setBoolean(DEBUG_HCAT_EXPORT_MAPPER_PROP,
+      Boolean.getBoolean(DEBUG_HCAT_EXPORT_MAPPER_PROP));
     configured = true;
   }
 
@@ -712,7 +725,6 @@ public final class SqoopHCatUtilities {
 
   /**
    * Add the Hive and HCatalog jar files to local classpath and dist cache.
-   * 
    * @throws IOException
    */
   public static void addJars(Job job, SqoopOptions options)
@@ -889,8 +901,6 @@ public final class SqoopHCatUtilities {
 
   /**
    * Execute HCat via an external 'bin/hcat' process.
-   * 
-   * 
    * @param env
    *          the environment strings to pass to any subprocess.
    * @throws IOException

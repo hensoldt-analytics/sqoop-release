@@ -44,7 +44,6 @@ import org.apache.hcatalog.data.schema.HCatSchema;
 import org.apache.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
 import org.apache.sqoop.hcat.HCatalogTestUtils.CreateMode;
 import org.apache.sqoop.hcat.HCatalogTestUtils.KeyType;
-import org.apache.sqoop.mapreduce.hcat.SqoopHCatImportMapper;
 import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 import org.junit.Before;
 
@@ -448,7 +447,7 @@ public class TestHCatalogImport extends ImportJobTestCase {
     List<String> addlArgsArray = new ArrayList<String>();
     List<String> cfgParams = new ArrayList<String>();
     cfgParams.add("-D");
-    cfgParams.add(SqoopHCatImportMapper.DEBUG_HCAT_IMPORT_MAPPER_PROP
+    cfgParams.add(SqoopHCatUtilities.DEBUG_HCAT_IMPORT_MAPPER_PROP
       + "=true");
     setConfigParams(cfgParams);
     String[] colNames = new String[] { "ID", "MSG" };
@@ -466,7 +465,7 @@ public class TestHCatalogImport extends ImportJobTestCase {
     List<String> addlArgsArray = new ArrayList<String>();
     List<String> cfgParams = new ArrayList<String>();
     cfgParams.add("-D");
-    cfgParams.add(SqoopHCatImportMapper.DEBUG_HCAT_IMPORT_MAPPER_PROP
+    cfgParams.add(SqoopHCatUtilities.DEBUG_HCAT_IMPORT_MAPPER_PROP
       + "=true");
     setConfigParams(cfgParams);
     String[] colNames = new String[] { "ID", "MSG" };
@@ -667,6 +666,22 @@ public class TestHCatalogImport extends ImportJobTestCase {
     addlArgsArray.add("--hive-delims-replacement");
     addlArgsArray.add("^");
     setExtraArgs(addlArgsArray);
+    runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
+  }
+
+  public void testDynamicKeyInMiddle() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    ColumnGenerator[] cols = new ColumnGenerator[] {
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, "1",
+        "1", KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, "2",
+        "2", KeyType.DYNAMIC_KEY), };
+    List<String> addlArgsArray = new ArrayList<String>();
+    setExtraArgs(addlArgsArray);
+    utils.setStorageInfo(HCatalogTestUtils.STORED_AS_SEQFILE);
     runHCatImport(addlArgsArray, TOTAL_RECORDS, table, cols, null);
   }
 }

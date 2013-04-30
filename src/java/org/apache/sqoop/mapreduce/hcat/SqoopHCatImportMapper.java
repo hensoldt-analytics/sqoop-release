@@ -62,8 +62,7 @@ public class SqoopHCatImportMapper extends
   WritableComparable, HCatRecord> {
   public static final Log LOG = LogFactory
     .getLog(SqoopHCatImportMapper.class.getName());
-  public static final String DEBUG_HCAT_IMPORT_MAPPER_PROP =
-    "sqoop.debug.import.mapper";
+
   private static boolean debugHCatImportMapper = false;
 
   private InputJobInfo jobInfo;
@@ -119,7 +118,7 @@ public class SqoopHCatImportMapper extends
       ImportJobBase.PROPERTY_BIGDECIMAL_FORMAT,
       ImportJobBase.PROPERTY_BIGDECIMAL_FORMAT_DEFAULT);
     debugHCatImportMapper = conf.getBoolean(
-      DEBUG_HCAT_IMPORT_MAPPER_PROP, false);
+      SqoopHCatUtilities.DEBUG_HCAT_IMPORT_MAPPER_PROP, false);
     SqoopHCatUtilities.IntArrayWritable delimArray =
       DefaultStringifier.load(conf,
         SqoopHCatUtilities.HIVE_DELIMITERS_TO_REPLACE_PROP,
@@ -142,6 +141,7 @@ public class SqoopHCatImportMapper extends
     staticPartitionKey =
       conf.get(SqoopHCatUtilities.HCAT_STATIC_PARTITION_KEY_PROP);
     LOG.debug("Static partition key used : " + staticPartitionKey);
+
 
   }
 
@@ -170,7 +170,7 @@ public class SqoopHCatImportMapper extends
   private HCatRecord convertToHCatRecord(SqoopRecord sqr)
     throws IOException {
     Map<String, Object> fieldMap = sqr.getFieldMap();
-    HCatRecord result = new DefaultHCatRecord(fieldMap.keySet().size());
+    HCatRecord result = new DefaultHCatRecord(fieldCount);
 
     for (Map.Entry<String, Object> entry : fieldMap.entrySet()) {
       String key = entry.getKey();
@@ -186,18 +186,13 @@ public class SqoopHCatImportMapper extends
           + ", hcattype " + hfs.getTypeString());
       }
       Object hCatVal = toHCat(val, hfs.getType(), hfs.getTypeString());
-      // This needs to be checked.
-      // if (hCatVal == null
-      // && partitionSchema.getFieldNames().contains(key)) {
-      // throw new IOException("Dynamic partition keys cannot be null."
-      // + "  Please make sure that the column " + key
-      // + " is declared as not null in the database");
-      // }
+
       result.set(hfn, hCatFullTableSchema, hCatVal);
     }
 
     return result;
   }
+
 
   private Object toHCat(Object val, HCatFieldSchema.Type hfsType,
     String hCatTypeString) {
