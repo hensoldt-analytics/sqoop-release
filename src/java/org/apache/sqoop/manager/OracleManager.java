@@ -21,6 +21,7 @@ package org.apache.sqoop.manager;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -29,6 +30,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -37,6 +39,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -767,6 +770,84 @@ public class OracleManager
     }
 
     return columns.toArray(new String[columns.size()]);
+  }
+
+
+  @Override
+  public String[] getColumnNamesForProcedure(String procedureName) {
+    List<String> ret = new ArrayList<String>();
+    try {
+      DatabaseMetaData metaData = this.getConnection().getMetaData();
+      ResultSet results = metaData.getProcedureColumns(null, null,
+        procedureName, null);
+      if (null == results) {
+        return null;
+      }
+
+      try {
+        while (results.next()) {
+          if (results.getInt("COLUMN_TYPE")
+          != DatabaseMetaData.procedureColumnReturn) {
+            int index = results.getInt("ORDINAL_POSITION");
+            if (index < 0) {
+              continue; // actually the return type
+            }
+            for (int i = ret.size(); i < index; ++i) {
+              ret.add(null);
+            }
+            String name = results.getString("COLUMN_NAME");
+            if (index == ret.size()) {
+              ret.add(name);
+            } else {
+              ret.set(index, name);
+            }
+          }
+        }
+        String[] result = ret.toArray(new String[ret.size()]);
+        LOG.debug("getColumnsNamesForProcedure returns "
+          + Arrays.toString(ret.toArray()));
+        return result;
+      } finally {
+        results.close();
+        getConnection().commit();
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Can't fetch column names for procedure.", e);
+    }
+  }
+
+  @Override
+  public Map<String, Integer> getColumnTypesForProcedure(String procedureName) {
+    Map<String, Integer> ret = new TreeMap<String, Integer>();
+    try {
+      DatabaseMetaData metaData = this.getConnection().getMetaData();
+      ResultSet results = metaData.getProcedureColumns(null, null,
+          procedureName, null);
+      if (null == results) {
+        return null;
+      }
+
+      try {
+        while (results.next()) {
+          if (results.getInt("COLUMN_TYPE") != DatabaseMetaData.procedureColumnReturn
+              && results.getInt("ORDINAL_POSITION") >= 0) {
+            // we don't care if we get several rows for the
+            // same ORDINAL_POSITION (e.g. like H2 gives us)
+            // as we'll just overwrite the entry in the map:
+            ret.put(results.getString("COLUMN_NAME"),
+                results.getInt("DATA_TYPE"));
+          }
+        }
+        return ret.isEmpty() ? null : ret;
+      } finally {
+        results.close();
+        getConnection().commit();
+      }
+    } catch (SQLException sqlException) {
+      LOG.error("Error reading primary key metadata: "
+          + sqlException.toString());
+      return null;
+    }
   }
 
   @Override
