@@ -78,6 +78,9 @@ public class SqoopHCatImportMapper extends
   private boolean doHiveDelimsReplacement = false;
   private DelimiterSet hiveDelimiters;
   private String staticPartitionKey;
+  private int[] hCatFieldPositions;
+  private int colCount;
+
   @Override
   protected void setup(Context context)
     throws IOException, InterruptedException {
@@ -119,11 +122,8 @@ public class SqoopHCatImportMapper extends
       ImportJobBase.PROPERTY_BIGDECIMAL_FORMAT_DEFAULT);
     debugHCatImportMapper = conf.getBoolean(
       SqoopHCatUtilities.DEBUG_HCAT_IMPORT_MAPPER_PROP, false);
-    SqoopHCatUtilities.IntArrayWritable delimArray =
-      DefaultStringifier.load(conf,
-        SqoopHCatUtilities.HIVE_DELIMITERS_TO_REPLACE_PROP,
-        SqoopHCatUtilities.IntArrayWritable.class);
-    IntWritable[] delimChars = (IntWritable[]) delimArray.toArray();
+    IntWritable[] delimChars = DefaultStringifier.loadArray(conf,
+        SqoopHCatUtilities.HIVE_DELIMITERS_TO_REPLACE_PROP, IntWritable.class);
     hiveDelimiters = new DelimiterSet(
       (char) delimChars[0].get(), (char) delimChars[1].get(),
       (char) delimChars[2].get(), (char) delimChars[3].get(),
@@ -135,6 +135,14 @@ public class SqoopHCatImportMapper extends
     }
     doHiveDelimsReplacement = Boolean.valueOf(conf.get(
       SqoopHCatUtilities.HIVE_DELIMITERS_REPLACEMENT_ENABLED_PROP));
+
+    IntWritable[] fPos = DefaultStringifier.loadArray(conf,
+        SqoopHCatUtilities.HCAT_FIELD_POSITIONS_PROP, IntWritable.class);
+    hCatFieldPositions = new int[fPos.length];
+    for (int i = 0; i < fPos.length; ++i) {
+      hCatFieldPositions[i] = fPos[i].get();
+    }
+
     LOG.debug("Hive delims replacement enabled : " + doHiveDelimsReplacement);
     LOG.debug("Hive Delimiters : " + hiveDelimiters.toString());
     LOG.debug("Hive delimiters replacement : " + hiveDelimsReplacement);
@@ -156,7 +164,9 @@ public class SqoopHCatImportMapper extends
     } catch (SQLException sqlE) {
       throw new IOException(sqlE);
     }
-
+    if (colCount == -1) {
+      colCount = value.getFieldMap().size();
+    }
     context.write(key, convertToHCatRecord(value));
   }
 

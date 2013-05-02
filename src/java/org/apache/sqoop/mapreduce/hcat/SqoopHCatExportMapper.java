@@ -34,7 +34,7 @@ import org.apache.hadoop.io.DefaultStringifier;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hcatalog.common.HCatConstants;
@@ -59,8 +59,7 @@ public class SqoopHCatExportMapper
   private InputJobInfo jobInfo;
   private HCatSchema hCatFullTableSchema;
   private List<HCatFieldSchema> hCatSchemaFields;
-  private MapWritable colTypesJava;
-  private MapWritable colTypesSql;
+
   private SqoopRecord sqoopRecord;
   private static final String TIMESTAMP_TYPE = "java.sql.Timestamp";
   private static final String TIME_TYPE = "java.sql.Time";
@@ -79,6 +78,8 @@ public class SqoopHCatExportMapper
   private static final String BYTESWRITABLE =
     "org.apache.hadoop.io.BytesWritable";
   private static boolean debugHCatExportMapper = false;
+  private MapWritable colTypesJava;
+  private MapWritable colTypesSql;
 
   @Override
   protected void setup(Context context)
@@ -86,11 +87,13 @@ public class SqoopHCatExportMapper
     super.setup(context);
 
     Configuration conf = context.getConfiguration();
+
     colTypesJava = DefaultStringifier.load(conf,
       SqoopHCatUtilities.HCAT_DB_OUTPUT_COLTYPES_JAVA, MapWritable.class);
     colTypesSql = DefaultStringifier.load(conf,
       SqoopHCatUtilities.HCAT_DB_OUTPUT_COLTYPES_SQL, MapWritable.class);
     // Instantiate a copy of the user's class to hold and parse the record.
+
     String recordClassName = conf.get(
       ExportJobBase.SQOOP_EXPORT_TABLE_CLASS_KEY);
     if (null == recordClassName) {
@@ -136,12 +139,13 @@ public class SqoopHCatExportMapper
 
   private SqoopRecord convertToSqoopRecord(HCatRecord hcr)
     throws IOException {
-
-    for (Map.Entry<Writable, Writable> e : colTypesJava.entrySet()) {
-      String colName = e.getKey().toString();
-      String javaColType = e.getValue().toString();
-      int sqlType = ((IntWritable) colTypesSql.get(e.getKey())).get();
+    Text key = new Text();
+    for (Map.Entry<String, Object> e : sqoopRecord.getFieldMap().entrySet()) {
+      String colName = e.getKey();
       String hfn = colName.toLowerCase();
+      key.set(hfn);
+      String javaColType = colTypesJava.get(key).toString();
+      int sqlType = ((IntWritable) colTypesSql.get(key)).get();
       HCatFieldSchema field =
         hCatFullTableSchema.get(hfn);
       HCatFieldSchema.Type fieldType = field.getType();
