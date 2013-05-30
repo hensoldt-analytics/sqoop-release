@@ -1,6 +1,7 @@
 Condor-1.4.3 branched from Apache @ release-1.4.3-rc0 (82fde21d0f6c89059bade4588f3ba6989989dc76)
 https://git-wip-us.apache.org/repos/asf?p=sqoop.git;a=commit;h=82fde21d0f6c89059bade4588f3ba6989989dc76
 
+CONDOR:
  INCOMPATIBLE CHANGES
 
 
@@ -13,3 +14,17 @@ https://git-wip-us.apache.org/repos/asf?p=sqoop.git;a=commit;h=82fde21d0f6c89059
  BUG FIXES
    SQOOP-916. Add an abort validation handler
    SQOOP-798. ant docs doesn't work on RedHat 5.8. 
+
+
+COMANCHE:
+ INCOMPATIBLE CHANGES
+ 
+ 
+ NEW FEATURES
+
+
+ IMPROVEMENTS
+
+
+ BUG FIXES
+ 
