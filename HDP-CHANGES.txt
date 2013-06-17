@@ -12,8 +12,10 @@ CONDOR:
 
 
  BUG FIXES
-   SQOOP-916. Add an abort validation handler
    SQOOP-798. ant docs doesn't work on RedHat 5.8. 
+   SQOOP-914. Add an abort validation handler
+   SQOOP-916. Securing passwords in sqoop 1.x
+   SQOOP-979. MySQL direct connector is not working correct after moving password to credential cache 
 
 
 COMANCHE:
