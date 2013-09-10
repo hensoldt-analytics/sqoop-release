@@ -138,7 +138,7 @@
   <property environment="env"/>
   <property name="name" value="sqoop" />
   <property name="Name" value="Sqoop" />
-  <property name="version" value="1.4.5-SNAPSHOT" />
+  <property name="version" value="1.4.4" />
 
   <!-- The last version released. -->
   <property name="oldversion" value="1.4.4" />
@@ -1017,7 +1017,9 @@
     <echo message="Release audit report: ${build.dir}/rat.log" />
   </target>
 
-  <target name="mvn-prep" depends="init,ivy-resolve-test">
+  <target name="mvn-prep" depends="init,ivy-resolve-test"
+           unless="mvn-prep.initialized">
+     <property name="mvn-prep.initialized" value="true" />
     <!-- prepare for mvn tasks. -->
 
     <!-- Download maven -->
