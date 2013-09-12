@@ -55,6 +55,12 @@
     For Hive/HCatalog 0.11 and earlier
     ant -Dhcatprofile=11 <rest of the args>
 
+
+    hcatalog 0.11 will be the default for now.
+
+    For Hive/HCatalog 0.11 and earlier
+    ant -Dhcatprofile=11 <rest of the args>
+
     For HCatalog 0.12 
     ant -Dhcatprofile=12 <rest of the args>
 
