@@ -44,6 +44,44 @@
   </if>
 
   <!--
+    Set default HCatalog profile if not set
+
+    In Hive 0.12, the HCatalog artifcat is moving from org.apache.hcatalog
+    to org.apache.hive.hcatalog.   So, we will create two ivy configurations
+    and based on the profile will choose hcat 0.11 or 0.12.
+
+    hcatalog 0.11 will be the default for now.
+
+    For Hive/HCatalog 0.11 and earlier
+    ant -Dhcatprofile=11 <rest of the args>
+
+    For HCatalog 0.12 and later
+    ant -Dhcatprofile=12
+  -->
+  <if>
+    <isset property="hcatprofile" />
+    <then>
+      <if>
+        <or>
+          <equals arg1="${hcatprofile}" arg2="12" />
+          <equals arg1="${hcatprofile}" arg2="11" />
+        </or>
+        <then>
+          <echo message="Using HCatalog profile ${hcatprofile}" />
+        </then>
+        <else>
+          <fail message="Invalid value for hcatprofile" />
+        </else>
+      </if>
+    </then>
+    <else>
+      <echo message="Using HCatalog profile 0.11" />
+      <property name="hcatprofile" value="11" />
+    </else>
+  </if>
+
+
+  <!--
     Set default HBase profile if not set
 
     HBase 0.95 has broken one big monolithic archive into smaller pieces, so
