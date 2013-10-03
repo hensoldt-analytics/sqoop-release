@@ -57,9 +57,9 @@ import com.cloudera.sqoop.tool.SqoopTool;
 /**
  * Test that we can export HCatalog tables into databases.
  */
-public class HCatalogImportTest extends ImportJobTestCase {
+public class TestHCatalogImport extends ImportJobTestCase {
   private static final Log LOG =
-    LogFactory.getLog(HCatalogImportTest.class);
+    LogFactory.getLog(TestHCatalogImport.class);
   private final HCatalogTestUtils utils = HCatalogTestUtils.instance();
   private List<String> extraTestArgs = null;
   private List<String> configParams = null;

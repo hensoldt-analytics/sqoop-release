@@ -23,8 +23,8 @@ import com.cloudera.sqoop.hbase.HBaseImportNullTest;
 import com.cloudera.sqoop.hbase.HBaseImportTypesTest;
 import com.cloudera.sqoop.manager.DB2ManagerImportManualTest;
 
-import org.apache.sqoop.hcat.HCatalogExportTest;
-import org.apache.sqoop.hcat.HCatalogImportTest;
+import org.apache.sqoop.hcat.TestHCatalogExport;
+import org.apache.sqoop.hcat.TestHCatalogImport;
 
 import com.cloudera.sqoop.hbase.HBaseImportTest;
 import com.cloudera.sqoop.hbase.HBaseQueryImportTest;
@@ -123,8 +123,8 @@ public final class ThirdPartyTests extends TestCase {
     suite.addTestSuite(HBaseUtilTest.class);
 
     // HCatalog
-    suite.addTestSuite(HCatalogImportTest.class);
-    suite.addTestSuite(HCatalogExportTest.class);
+    //suite.addTestSuite(TestHCatalogImport.class);
+    //suite.addTestSuite(TestHCatalogExport.class);
 
     // Call Export tests
     suite.addTestSuite(MySqlCallExportTest.class);

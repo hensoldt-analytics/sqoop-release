@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
-import org.apache.sqoop.hcat.HCatalogImportTest;
+import org.apache.sqoop.hcat.TestHCatalogImport;
 import org.apache.sqoop.hcat.HCatalogTestUtils;
 import org.apache.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
 import org.apache.sqoop.hcat.HCatalogTestUtils.KeyType;
@@ -38,7 +38,7 @@ import com.cloudera.sqoop.SqoopOptions;
 /**
  * Test the DirectNetezzaManager implementation's hcatalog import functionality.
  */
-public class DirectNetezzaHCatImportManualTest extends HCatalogImportTest {
+public class DirectNetezzaHCatImportManualTest extends TestHCatalogImport {
   // instance variables populated during setUp, used during tests
   private NetezzaManager manager;
 
