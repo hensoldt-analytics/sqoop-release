@@ -918,7 +918,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     }
 
     if (in.hasOption(HCATALOG_DATABASE_ARG)) {
-      out.setHCatDatabaseName(in.getOptionValue(HCATALOG_TABLE_ARG));
+      out.setHCatDatabaseName(in.getOptionValue(HCATALOG_DATABASE_ARG));
     }
 
     if (in.hasOption(HCATALOG_STORAGE_STANZA_ARG)) {
