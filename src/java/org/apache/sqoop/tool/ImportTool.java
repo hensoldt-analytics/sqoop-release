@@ -890,6 +890,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
           "Cannot specify --" + SQL_QUERY_ARG + " and --table together."
           + HELP_STR);
     } else if (options.getSqlQuery() != null
+        && options.getHCatTableName() == null
         && options.getTargetDir() == null && options.getHBaseTable() == null) {
       throw new InvalidOptionsException(
           "Must specify destination with --target-dir."
