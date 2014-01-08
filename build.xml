@@ -48,21 +48,25 @@
 
     In Hive 0.12, the HCatalog artifcat is moving from org.apache.hcatalog
     to org.apache.hive.hcatalog.   So, we will create two ivy configurations
-    and based on the profile will choose hcat 0.11 or 0.12.
+    and based on the profile will choose hcat 0.11, 0.12, or 0.13
 
     hcatalog 0.11 will be the default for now.
 
     For Hive/HCatalog 0.11 and earlier
     ant -Dhcatprofile=11 <rest of the args>
 
-    For HCatalog 0.12 and later
-    ant -Dhcatprofile=12
+    For HCatalog 0.12 
+    ant -Dhcatprofile=12 <rest of the args>
+
+    For HCatalog 0.13  <rest of the args>
+    ant -Dhcatprofile=13
   -->
   <if>
     <isset property="hcatprofile" />
     <then>
       <if>
         <or>
+          <equals arg1="${hcatprofile}" arg2="13" />
           <equals arg1="${hcatprofile}" arg2="12" />
           <equals arg1="${hcatprofile}" arg2="11" />
         </or>

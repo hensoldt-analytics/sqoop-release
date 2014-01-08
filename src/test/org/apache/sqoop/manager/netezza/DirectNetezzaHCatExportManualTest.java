@@ -25,7 +25,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hcatalog.data.schema.HCatFieldSchema;
+import org.apache.hive.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.sqoop.hcat.TestHCatalogExport;
 import org.apache.sqoop.hcat.HCatalogTestUtils;
 import org.apache.sqoop.hcat.HCatalogTestUtils.ColumnGenerator;
