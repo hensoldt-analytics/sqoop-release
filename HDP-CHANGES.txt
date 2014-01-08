@@ -1,1 +1,9 @@
-bigwheel-M10-1.4.4 is branched from hortonworks  bigwheel-GA-1.4.4 SHA1  6dae6dc8ed5473586f650f80816277854c7dd44a @  git@github.com:hortonworks/sqoop.git
+ INCOMPATIBLE CHANGES
+
+
+ NEW FEATURES
+
+
+ IMPROVEMENTS
+
+ BUG FIXES
