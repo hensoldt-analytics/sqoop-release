@@ -154,6 +154,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String UPDATE_KEY_ARG = "update-key";
   public static final String UPDATE_MODE_ARG = "update-mode";
   public static final String CALL_ARG = "call";
+  public static final String SKIP_DISTCACHE_ARG = "skip-dist-cache";
 
   // Arguments for validation.
   public static final String VALIDATE_ARG = "validate";
@@ -175,7 +176,23 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String HBASE_TABLE_ARG = "hbase-table";
   public static final String HBASE_COL_FAM_ARG = "column-family";
   public static final String HBASE_ROW_KEY_ARG = "hbase-row-key";
+  public static final String HBASE_BULK_LOAD_ENABLED_ARG =
+      "hbase-bulkload";
   public static final String HBASE_CREATE_TABLE_ARG = "hbase-create-table";
+
+  //Accumulo arguments.
+  public static final String ACCUMULO_TABLE_ARG = "accumulo-table";
+  public static final String ACCUMULO_COL_FAM_ARG = "accumulo-column-family";
+  public static final String ACCUMULO_ROW_KEY_ARG = "accumulo-row-key";
+  public static final String ACCUMULO_VISIBILITY_ARG = "accumulo-visibility";
+  public static final String ACCUMULO_CREATE_TABLE_ARG
+      = "accumulo-create-table";
+  public static final String ACCUMULO_BATCH_SIZE_ARG = "accumulo-batch-size";
+  public static final String ACCUMULO_MAX_LATENCY_ARG = "accumulo-max-latency";
+  public static final String ACCUMULO_ZOOKEEPERS_ARG = "accumulo-zookeepers";
+  public static final String ACCUMULO_INSTANCE_ARG = "accumulo-instance";
+  public static final String ACCUMULO_USER_ARG = "accumulo-user";
+  public static final String ACCUMULO_PASSWORD_ARG = "accumulo-password";
 
 
   // Arguments for the saved job management system.
@@ -413,6 +430,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
             .hasArg().withDescription("Override $HADOOP_MAPRED_HOME_ARG")
             .withLongOpt(HADOOP_HOME_ARG)
             .create());
+    commonOpts.addOption(OptionBuilder
+        .withDescription("Skip copying jars to distributed cache")
+        .withLongOpt(SKIP_DISTCACHE_ARG)
+        .create());
 
     // misc (common)
     commonOpts.addOption(OptionBuilder
@@ -710,12 +731,126 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         .withLongOpt(HBASE_ROW_KEY_ARG)
         .create());
     hbaseOpts.addOption(OptionBuilder
+        .withDescription("Enables HBase bulk loading")
+        .withLongOpt(HBASE_BULK_LOAD_ENABLED_ARG)
+        .create());
+    hbaseOpts.addOption(OptionBuilder
         .withDescription("If specified, create missing HBase tables")
         .withLongOpt(HBASE_CREATE_TABLE_ARG)
         .create());
 
     return hbaseOpts;
   }
+
+  protected RelatedOptions getAccumuloOptions() {
+    RelatedOptions accumuloOpts =
+      new RelatedOptions("Accumulo arguments");
+    accumuloOpts.addOption(OptionBuilder.withArgName("table")
+      .hasArg()
+      .withDescription("Import to <table> in Accumulo")
+      .withLongOpt(ACCUMULO_TABLE_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("family")
+      .hasArg()
+      .withDescription("Sets the target column family for the import")
+      .withLongOpt(ACCUMULO_COL_FAM_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("col")
+      .hasArg()
+      .withDescription("Specifies which input column to use as the row key")
+      .withLongOpt(ACCUMULO_ROW_KEY_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("vis")
+      .hasArg()
+      .withDescription("Visibility token to be applied to all rows imported")
+      .withLongOpt(ACCUMULO_VISIBILITY_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder
+      .withDescription("If specified, create missing Accumulo tables")
+      .withLongOpt(ACCUMULO_CREATE_TABLE_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("size")
+      .hasArg()
+      .withDescription("Batch size in bytes")
+      .withLongOpt(ACCUMULO_BATCH_SIZE_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("latency")
+      .hasArg()
+      .withDescription("Max write latency in milliseconds")
+      .withLongOpt(ACCUMULO_MAX_LATENCY_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("zookeepers")
+      .hasArg()
+      .withDescription("Comma-separated list of zookeepers (host:port)")
+      .withLongOpt(ACCUMULO_ZOOKEEPERS_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("instance")
+      .hasArg()
+      .withDescription("Accumulo instance name.")
+      .withLongOpt(ACCUMULO_INSTANCE_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("user")
+      .hasArg()
+      .withDescription("Accumulo user name.")
+      .withLongOpt(ACCUMULO_USER_ARG)
+      .create());
+    accumuloOpts.addOption(OptionBuilder.withArgName("password")
+      .hasArg()
+      .withDescription("Accumulo password.")
+      .withLongOpt(ACCUMULO_PASSWORD_ARG)
+      .create());
+
+    return accumuloOpts;
+  }
+
+  protected void applyAccumuloOptions(CommandLine in, SqoopOptions out) {
+    if (in.hasOption(ACCUMULO_TABLE_ARG)) {
+      out.setAccumuloTable(in.getOptionValue(ACCUMULO_TABLE_ARG));
+    }
+
+    if (in.hasOption(ACCUMULO_COL_FAM_ARG)) {
+      out.setAccumuloColFamily(in.getOptionValue(ACCUMULO_COL_FAM_ARG));
+    }
+
+    if (in.hasOption(ACCUMULO_ROW_KEY_ARG)) {
+      out.setAccumuloRowKeyColumn(in.getOptionValue(ACCUMULO_ROW_KEY_ARG));
+    }
+
+    if (in.hasOption(ACCUMULO_VISIBILITY_ARG)) {
+      out.setAccumuloVisibility(in.getOptionValue(ACCUMULO_VISIBILITY_ARG));
+    }
+
+    if (in.hasOption(ACCUMULO_CREATE_TABLE_ARG)) {
+      out.setCreateAccumuloTable(true);
+    }
+
+    if (in.hasOption(ACCUMULO_BATCH_SIZE_ARG)) {
+      out.setAccumuloBatchSize(Long.parseLong(
+        in.getOptionValue(ACCUMULO_BATCH_SIZE_ARG)));
+    }
+
+    if (in.hasOption(ACCUMULO_MAX_LATENCY_ARG)) {
+      out.setAccumuloMaxLatency(Long.parseLong(
+        in.getOptionValue(ACCUMULO_MAX_LATENCY_ARG)));
+    }
+
+    if (in.hasOption(ACCUMULO_ZOOKEEPERS_ARG)) {
+      out.setAccumuloZookeepers(in.getOptionValue(ACCUMULO_ZOOKEEPERS_ARG));
+    }
+
+    if (in.hasOption(ACCUMULO_INSTANCE_ARG)) {
+      out.setAccumuloInstance(in.getOptionValue(ACCUMULO_INSTANCE_ARG));
+    }
+
+    if (in.hasOption(ACCUMULO_USER_ARG)) {
+      out.setAccumuloUser(in.getOptionValue(ACCUMULO_USER_ARG));
+    }
+
+    if (in.hasOption(ACCUMULO_PASSWORD_ARG)) {
+      out.setAccumuloPassword(in.getOptionValue(ACCUMULO_PASSWORD_ARG));
+    }
+  }
+
 
   @SuppressWarnings("static-access")
   protected void addValidationOpts(RelatedOptions validationOptions) {
@@ -820,6 +955,11 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       out.setDriverClassName(in.getOptionValue(DRIVER_ARG));
     }
 
+    if (in.hasOption(SKIP_DISTCACHE_ARG)) {
+      LOG.debug("Disabling dist cache");
+      out.setSkipDistCache(true);
+    }
+
     applyCredentialsOptions(in, out);
 
 
@@ -861,7 +1001,9 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       try {
         out.setPasswordFilePath(in.getOptionValue(PASSWORD_PATH_ARG));
         // apply password from file into password in options
-        out.setPassword(CredentialsUtil.fetchPasswordFromFile(out));
+        out.setPassword(CredentialsUtil.fetchPassword(out));
+        // And allow the PasswordLoader to clean up any sensitive properties
+        CredentialsUtil.cleanUpSensitiveProperties(out.getConf());
       } catch (IOException ex) {
         LOG.warn("Failed to load connection parameter file", ex);
         throw new InvalidOptionsException(
@@ -1076,6 +1218,8 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       out.setHBaseRowKeyColumn(in.getOptionValue(HBASE_ROW_KEY_ARG));
     }
 
+    out.setHBaseBulkLoadEnabled(in.hasOption(HBASE_BULK_LOAD_ENABLED_ARG));
+
     if (in.hasOption(HBASE_CREATE_TABLE_ARG)) {
       out.setCreateHBaseTable(true);
     }
@@ -1236,6 +1380,52 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     }
   }
 
+  protected void validateAccumuloOptions(SqoopOptions options)
+      throws InvalidOptionsException {
+    if ((options.getAccumuloColFamily() != null
+        && options.getAccumuloTable() == null)
+        || (options.getAccumuloColFamily() == null
+        && options.getAccumuloTable() != null)) {
+      throw new InvalidOptionsException(
+          "Both --accumulo-table and --accumulo-column-family must be set."
+          + HELP_STR);
+    }
+    if (options.getAccumuloTable() != null && options.isDirect()) {
+      throw new InvalidOptionsException("Direct import is incompatible with "
+            + "Accumulo. Please remove parameter --direct");
+    }
+    if (options.getAccumuloTable() != null
+        && options.getHBaseTable() != null) {
+      throw new InvalidOptionsException("HBase import is incompatible with "
+            + "Accumulo import.");
+    }
+    if (options.getAccumuloTable() != null
+        && options.getFileLayout() != SqoopOptions.FileLayout.TextFile) {
+      throw new InvalidOptionsException("Accumulo import is not compatible "
+        + "with importing into file format.");
+    }
+    if (options.getAccumuloTable() != null
+        && options.getHBaseColFamily() != null) {
+      throw new InvalidOptionsException("Use --accumulo-column-family with "
+            + "Accumulo import.");
+    }
+    if (options.getAccumuloTable() != null
+        && options.getAccumuloUser() == null) {
+      throw
+        new InvalidOptionsException("Must specify Accumulo user.");
+    }
+    if (options.getAccumuloTable() != null
+        && options.getAccumuloInstance() == null) {
+      throw new
+        InvalidOptionsException("Must specify Accumulo instance.");
+    }
+    if (options.getAccumuloTable() != null
+        && options.getAccumuloZookeepers() == null) {
+      throw new
+        InvalidOptionsException("Must specify Zookeeper server(s).");
+    }
+  }
+
   protected void validateHCatalogOptions(SqoopOptions options)
     throws InvalidOptionsException {
     // Make sure that one of hCatalog or hive jobs are used
@@ -1325,6 +1515,14 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     if (options.getHBaseTable() != null && options.isDirect()) {
       throw new InvalidOptionsException("Direct import is incompatible with "
         + "HBase. Please remove parameter --direct");
+    }
+
+    if (options.isBulkLoadEnabled() && options.getHBaseTable() == null) {
+      String validationMessage = String.format("Can't run import with %s " +
+          "without %s",
+          BaseSqoopTool.HBASE_BULK_LOAD_ENABLED_ARG,
+          BaseSqoopTool.HBASE_TABLE_ARG);
+      throw new InvalidOptionsException(validationMessage);
     }
   }
 

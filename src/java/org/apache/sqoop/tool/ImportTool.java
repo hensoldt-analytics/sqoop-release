@@ -685,6 +685,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
     toolOptions.addUniqueOptions(getHBaseOptions());
     toolOptions.addUniqueOptions(getHCatalogOptions());
     toolOptions.addUniqueOptions(getHCatImportOnlyOptions());
+    toolOptions.addUniqueOptions(getAccumuloOptions());
 
     // get common codegen opts.
     RelatedOptions codeGenOpts = getCodeGenOpts(allTables);
@@ -856,6 +857,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
       applyCodeGenOptions(in, out, allTables);
       applyHBaseOptions(in, out);
       applyHCatOptions(in, out);
+      applyAccumuloOptions(in, out);
 
     } catch (NumberFormatException nfe) {
       throw new InvalidOptionsException("Error: expected numeric argument.\n"
@@ -890,10 +892,12 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
           "Cannot specify --" + SQL_QUERY_ARG + " and --table together."
           + HELP_STR);
     } else if (options.getSqlQuery() != null
+        && options.getTargetDir() == null
+        && options.getHBaseTable() == null
         && options.getHCatTableName() == null
-        && options.getTargetDir() == null && options.getHBaseTable() == null) {
+        && options.getAccumuloTable() == null) {
       throw new InvalidOptionsException(
-          "Must specify destination with --target-dir."
+          "Must specify destination with --target-dir. "
           + HELP_STR);
     } else if (options.getSqlQuery() != null && options.doHiveImport()
         && options.getHiveTableName() == null) {
@@ -988,6 +992,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
     validateHBaseOptions(options);
     validateHiveOptions(options);
     validateHCatalogOptions(options);
+    validateAccumuloOptions(options);
   }
 }
 

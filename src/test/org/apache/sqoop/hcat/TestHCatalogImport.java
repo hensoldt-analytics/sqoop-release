@@ -173,7 +173,6 @@ public class TestHCatalogImport extends ImportJobTestCase {
     return args.toArray(new String[0]);
   }
 
-
   protected String[] getQueryArgv(boolean includeHadoopFlags, String[] colNames,
     Configuration conf) {
 
@@ -215,6 +214,7 @@ public class TestHCatalogImport extends ImportJobTestCase {
 
     return args.toArray(new String[0]);
   }
+
 
   private void validateHCatRecords(final List<HCatRecord> recs,
     final HCatSchema schema, int expectedCount,

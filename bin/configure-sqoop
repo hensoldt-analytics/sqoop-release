@@ -44,7 +44,21 @@ if [ -z "${HADOOP_COMMON_HOME}" ]; then
   if [ -n "${HADOOP_HOME}" ]; then
     HADOOP_COMMON_HOME=${HADOOP_HOME}
   else
-    HADOOP_COMMON_HOME=/usr/lib/hadoop
+    if [ -d "/usr/lib/hadoop" ]; then
+      HADOOP_COMMON_HOME=/usr/lib/hadoop
+    else
+      HADOOP_COMMON_HOME=${SQOOP_HOME}/../hadoop
+    fi
+  fi
+fi
+
+  HADOOP_MAPRED_HOME=/usr/lib/hadoop-mapreduce
+  if [ ! -d "${HADOOP_MAPRED_HOME}" ]; then
+    if [ -n "${HADOOP_HOME}" ]; then
+      HADOOP_MAPRED_HOME=${HADOOP_HOME}
+    else
+      HADOOP_MAPRED_HOME=${SQOOP_HOME}/../hadoop-mapreduce
+    fi
   fi
 fi
 
@@ -58,10 +72,32 @@ if [ -z "${HADOOP_HOME}" ]; then
 fi
 
 if [ -z "${HBASE_HOME}" ]; then
-  HBASE_HOME=/usr/lib/hbase
+  if [ -d "/usr/lib/hbase" ]; then
+    HBASE_HOME=/usr/lib/hbase
+  else
+    HBASE_HOME=${SQOOP_HOME}/../hbase
+  fi
 fi
 if [ -z "${HCAT_HOME}" ]; then
-  HCAT_HOME=/usr/lib/hcatalog
+  if [ -d "/usr/lib/hive-hcatalog" ]; then
+    HCAT_HOME=/usr/lib/hive-hcatalog
+  else
+    HCAT_HOME=${SQOOP_HOME}/../hive-hcatalog
+  fi
+fi
+if [ -z "${ACCUMULO_HOME}" ]; then
+  if [ -d "/usr/lib/accumulo" ]; then
+    ACCUMULO_HOME=/usr/lib/accumulo
+  else
+    ACCUMULO_HOME=${SQOOP_HOME}/../accumulo
+  fi
+fi
+if [ -z "${ZOOKEEPER_HOME}" ]; then
+  if [ -d "/usr/lib/zookeeper" ]; then
+    ZOOKEEPER_HOME=/usr/lib/zookeeper
+  else
+    ZOOKEEPER_HOME=${SQOOP_HOME}/../zookeeper
+  fi
 fi
 
 # Check: If we can't find our dependencies, give up here.
@@ -70,14 +106,6 @@ if [ ! -d "${HADOOP_COMMON_HOME}" ]; then
   echo 'Please set $HADOOP_COMMON_HOME to the root of your Hadoop installation.'
   exit 1
 fi
-
-if [ -z "${HADOOP_MAPRED_HOME}" ]; then
-  HADOOP_MAPRED_HOME=/usr/lib/hadoop-mapreduce
-  if [ ! -d "${HADOOP_MAPRED_HOME}" ]; then
-    HADOOP_MAPRED_HOME=${HADOOP_HOME}
-  fi
-fi
-
 if [ ! -d "${HADOOP_MAPRED_HOME}" ]; then
   echo "Error: $HADOOP_MAPRED_HOME does not exist!"
   echo 'Please set $HADOOP_MAPRED_HOME to the root of your Hadoop MapReduce installation.'
@@ -94,6 +122,15 @@ fi
 if [ ! -d "${HCAT_HOME}" ]; then
   echo "Warning: $HCAT_HOME does not exist! HCatalog jobs will fail."
   echo 'Please set $HCAT_HOME to the root of your HCatalog installation.'
+fi
+
+if [ ! -d "${ACCUMULO_HOME}" ]; then
+  echo "Warning: $ACCUMULO_HOME does not exist! Accumulo imports will fail."
+  echo 'Please set $ACCUMULO_HOME to the root of your Accumulo installation.'
+fi
+if [ ! -d "${ZOOKEEPER_HOME}" ]; then
+  echo "Warning: $ZOOKEEPER_HOME does not exist! Accumulo imports will fail."
+  echo 'Please set $ZOOKEEPER_HOME to the root of your Zookeeper installation.'
 fi
 
 # Where to find the main Sqoop jar
@@ -135,6 +172,16 @@ if [ -e "${HCAT_HOME}/bin/hcat" ]; then
   SQOOP_CLASSPATH=${TMP_SQOOP_CLASSPATH}
 fi
 
+# Add Accumulo to dependency list
+if [ -e "$ACCUMULO_HOME/bin/accumulo" ]; then
+  for jn in `$ACCUMULO_HOME/bin/accumulo classpath | grep file:.*accumulo.*jar | cut -d':' -f2`; do
+    SQOOP_CLASSPATH=$SQOOP_CLASSPATH:$jn
+  done
+  for jn in `$ACCUMULO_HOME/bin/accumulo classpath | grep file:.*zookeeper.*jar | cut -d':' -f2`; do
+    SQOOP_CLASSPATH=$SQOOP_CLASSPATH:$jn
+  done
+fi
+
 ZOOCFGDIR=${ZOOCFGDIR:-/etc/zookeeper}
 if [ -d "${ZOOCFGDIR}" ]; then
   SQOOP_CLASSPATH=$ZOOCFGDIR:$SQOOP_CLASSPATH
@@ -167,4 +214,4 @@ export HADOOP_MAPRED_HOME
 export HBASE_HOME
 export HCAT_HOME
 export HIVE_CONF_DIR
-
+export ACCUMULO_HOME
