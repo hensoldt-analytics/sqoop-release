@@ -52,6 +52,7 @@ if [ -z "${HADOOP_COMMON_HOME}" ]; then
   fi
 fi
 
+if [ -z "${HADOOP_MAPRED_HOME}" ]; then
   HADOOP_MAPRED_HOME=/usr/lib/hadoop-mapreduce
   if [ ! -d "${HADOOP_MAPRED_HOME}" ]; then
     if [ -n "${HADOOP_HOME}" ]; then
@@ -81,8 +82,13 @@ fi
 if [ -z "${HCAT_HOME}" ]; then
   if [ -d "/usr/lib/hive-hcatalog" ]; then
     HCAT_HOME=/usr/lib/hive-hcatalog
+  elif [ -d "/usr/lib/hcatalog" ]; then
+    HCAT_HOME=/usr/lib/hcatalog
   else
     HCAT_HOME=${SQOOP_HOME}/../hive-hcatalog
+    if [ ! -d ${HCAT_HOME} ]; then
+       HCAT_HOME=${SQOOP_HOME}/../hcatalog
+    fi
   fi
 fi
 if [ -z "${ACCUMULO_HOME}" ]; then
