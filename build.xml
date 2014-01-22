@@ -647,7 +647,7 @@
     <!-- copy in various components of the initial source layout
          so that the redistributable can bootstrap itself. -->
     <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="false">
-      <fileset dir="${basedir}">
+      <fileset dir="${basedir}" defaultexcludes="no">
         <include name="**/*" />
         <exclude name="build/**" />
         <exclude name="lib/**" />
@@ -744,7 +744,7 @@
     <!-- copy in various components of the initial source layout
          so that the redistributable can bootstrap itself. -->
     <copy todir="${src.dist.dir}" includeEmptyDirs="false" flatten="false">
-      <fileset dir="${basedir}">
+      <fileset dir="${basedir}" defaultexcludes="no">
         <include name="**/*" />
         <exclude name="build/**" />
         <exclude name=".git/**" />
