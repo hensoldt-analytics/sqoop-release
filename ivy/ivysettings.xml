@@ -47,7 +47,7 @@ under the License.
       override="false"/>
   <property name="maven2.pattern"
       value="[organisation]/[module]/[revision]/[artifact]-[revision](-[classifier])"/>
-  <property name="repo.dir" value="${user.home}/.m2/repository"/>
+  <property name="repo.dir" value="${user.home}/.m2/repository" override="false"/>
   <property name="maven2.pattern.ext"  value="${maven2.pattern}.[ext]"/>
   <property name="resolvers" value="default" override="false"/>
   <settings defaultResolver="${resolvers}"/>
