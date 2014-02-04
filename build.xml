@@ -311,6 +311,14 @@
 
   <!-- aspectJ fault injection -->
   <import file="${test.dir}/aop/build/aop.xml"/>
+  <!-- winpkg -->
+  <property name="winpkg.dir" value="${build.dir}/winpkg" />
+  <property name="winpkg.dist" value="${build.dir}/${artifact.name}.zip" />
+  <property name="package.dir" value="${base.src.dir}/packages" />
+  <property name="package.buildroot" value="${build.dir}/rpm/hcatalog_package_build_${user.name}"/>
+
+  <!-- aspectJ fault injection -->
+  <import file="${test.dir}/aop/build/aop.xml"/>
   <!-- Checking code style -->
   <property name="checkstyle.xml" value="${test.dir}/checkstyle.xml" />
   <property name="checkstyle.format.xsl"
@@ -757,6 +765,119 @@
     </tar>
   </target>
 
+  <target name="package-windows"
+      depends="jar-all,compile-all,ivy-retrieve-redist"
+      description="Create a redistributable package">
+
+    <mkdir dir="${dist.dir}"/>
+
+    <!-- copy in the build artifact -->
+    <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
+      <fileset dir="${build.dir}">
+        <include name="${dest.jar}" />
+      </fileset>
+    </copy>
+
+    <!-- copy the test artifact -->
+    <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
+      <fileset dir="${build.dir}">
+        <include name="${test.jar}" />
+      </fileset>
+    </copy>
+
+    <!-- copy in various components of the initial source layout
+         so that the redistributable can bootstrap itself. -->
+    <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="false">
+      <fileset dir="${basedir}">
+        <include name="**/*" />
+        <exclude name="build/**" />
+        <exclude name="lib/**" />
+        <exclude name="ivy/**" />
+        <exclude name="src/**" />
+        <exclude name=".git/**" />
+        <exclude name="tags" />
+        <exclude name=".project" />
+        <exclude name=".classpath" />
+        <exclude name="conf/managers.d/**" />
+        <exclude name="conf/tools.d/**" />
+        <exclude name="build.xml" />
+        <exclude name="ivy.xml" />
+        <exclude name="pom-old.xml" />
+      </fileset>
+    </copy>
+
+    <!-- copy the dependency libraries from ivy into the output lib dir -->
+    <mkdir dir="${dist.dir}/lib"/>
+    <copy todir="${dist.dir}/lib" includeEmptyDirs="false" flatten="true">
+      <fileset dir="${redist.ivy.lib.dir}">
+        <include name="**/*.jar" />
+      </fileset>
+    </copy>
+
+    <copy todir="${dist.dir}/lib" includeEmptyDirs="false">
+      <fileset dir="${lib.dir}">
+        <include name="**/*" />
+        <exclude name="ivy*" />
+      </fileset>
+    </copy>
+
+    <!-- In the configuration directory, take the sqoop-site-template
+         and copy it to sqoop-site.xml, overwriting any user-specified
+         sqoop-site.xml in there.
+     -->
+    <copy file="${dist.dir}/conf/sqoop-site-template.xml"
+        tofile="${dist.dir}/conf/sqoop-site.xml"
+        overwrite="true" />
+  </target>
+
+  <target name="winpkg" depends="zip, just-winpkg" />
+  <target name="just-winpkg" description="Package for Windows installation">
+        <!-- essentially copying the zip file and rip src and docs in the process -->
+        <zip destfile="${package.buildroot}/resources/${artifact.name}.zip">
+            <zipfileset src="${winpkg.dist}" excludes="**/src/**, **/docs/**"/>
+        </zip>
+
+      <copy todir="${package.buildroot}/scripts">
+        <fileset dir="${package.dir}/win/scripts">
+          <include name="**" />
+        </fileset>
+        <filterchain>
+          <replacetokens>
+            <token key="final.name" value="${artifact.name}" />
+            <token key="build.arch" value="${os.arch}" />
+            <token key="version" value="${version}" />
+          </replacetokens>
+        </filterchain>
+      </copy>
+      <copy todir="${package.buildroot}/resources">
+        <fileset dir="${package.dir}/win/resources">
+          <include name="**" />
+        </fileset>
+      </copy>
+      <copy todir="${package.buildroot}/template">
+        <fileset dir="${package.dir}/win/template">
+          <include name="**" />
+        </fileset>
+      </copy>
+      <zip destfile="${build.dir}/${artifact.name}.winpkg.zip">
+           <zipfileset dir="${package.buildroot}">
+            <include name="**" />
+           </zipfileset>
+      </zip>
+  </target>
+
+  <target name="zip"
+      depends="package-windows"
+      description="Package Sqoop in winpkg">
+    <delete file="${winpkg.dist}" />
+    <zip destfile="${winpkg.dist}">
+        <zipfileset dir="${dist.dir}/">
+            <include name="**/*" />
+        </zipfileset>
+    </zip>
+    <!--<delete dir="${winpkg.dir}" />-->
+  </target>
+
   <target name="srcpackage" description="Create a redistributable source package">
 
     <mkdir dir="${src.dist.dir}"/>
@@ -1013,6 +1134,7 @@
       <sysproperty key="sqoop.test.netezza.password" value="${sqoop.test.netezza.password}" />
       <sysproperty key="sqoop.test.netezza.db.name" value="${sqoop.test.netezza.db.name}" />
       <sysproperty key="sqoop.test.netezza.table.name" value="${sqoop.test.netezza.table.name}" />
+      <sysproperty key="java.library.path" value="${hadoop.library.path}" />
 
       <!-- Location of Hive logs -->
       <!--<sysproperty key="hive.log.dir"
@@ -1255,6 +1377,7 @@
 
   <target name="clean" description="Clean build target files">
     <delete dir="${build.dir}"/>
+    <delete file="${winpkg.dist}" />
   </target>
 
   <target name="clean-cache" description="Remove cached dependencies">
