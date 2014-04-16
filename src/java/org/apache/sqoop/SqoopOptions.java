@@ -262,6 +262,10 @@ public class SqoopOptions implements Cloneable {
   // the connection manager fully qualified class name
   @StoredAsProperty("connection.manager") private String connManagerClassName;
 
+  // Relaxed Isolation
+  @StoredAsProperty("relaxed.isolation") private boolean relaxedIsolation;
+
+
   // The currently active tool. (Not saved in properties)
   // Used to pass the SqoopTool instance in to mapreduce job configuration
   // (JobBase, etc).
@@ -885,6 +889,10 @@ public class SqoopOptions implements Cloneable {
     this.validatorClass = RowCountValidator.class;
     this.validationThresholdClass = AbsoluteValidationThreshold.class;
     this.validationFailureHandlerClass = AbortOnFailureHandler.class;
+
+    // Relaxed isolation will not enabled by default which is the behavior
+    // of sqoop until now.
+    this.relaxedIsolation = false;
   }
 
   /**
@@ -2131,5 +2139,14 @@ public class SqoopOptions implements Cloneable {
 
   public void setCall(String theCall) {
     this.call = theCall;
+  }
+
+  public void setRelaxedIsolation(boolean b) {
+    this.relaxedIsolation = true;
+
+  }
+
+  public boolean getRelaxedIsolation() {
+    return this.relaxedIsolation;
   }
 }

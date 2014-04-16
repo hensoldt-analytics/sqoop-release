@@ -22,8 +22,11 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang.ArrayUtils;
 import com.cloudera.sqoop.lib.DelimiterSet;
 import com.cloudera.sqoop.tool.ImportTool;
+import com.cloudera.sqoop.testutil.HsqldbTestServer;
+
 
 /**
  * Test aspects of the SqoopOptions class.
@@ -377,5 +380,23 @@ public class TestSqoopOptions extends TestCase {
 	assertEquals("/usr/lib/hadoop", opts.getHadoopMapRedHome());
   }
 
+  //helper method to validate given import options
+  private void validateImportOptions(String[] extraArgs) throws Exception {
+    String [] args = {
+      "--connect", HsqldbTestServer.getUrl(),
+      "--table", "test",
+      "-m", "1",
+    };
+    ImportTool importTool = new ImportTool();
+    SqoopOptions opts = importTool.parseArguments(
+        (String []) ArrayUtils.addAll(args, extraArgs), null, null, false);
+    importTool.validateOptions(opts);
+  }
 
+  public void testRelaxedIsolation() throws Exception {
+    String extraArgs[] = {
+      "--relaxed-isolation",
+    };
+    validateImportOptions(extraArgs);
+  }
 }

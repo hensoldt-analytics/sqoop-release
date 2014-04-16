@@ -155,6 +155,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String HELP_ARG = "help";
   public static final String UPDATE_KEY_ARG = "update-key";
   public static final String UPDATE_MODE_ARG = "update-mode";
+  public static final String RELAXED_ISOLATION = "relaxed-isolation";
   public static final String CALL_ARG = "call";
 
   // Arguments for validation.
@@ -421,6 +422,11 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     commonOpts.addOption(OptionBuilder
         .withDescription("Print usage instructions")
         .withLongOpt(HELP_ARG)
+        .create());
+    // relax isolation requirements
+    commonOpts.addOption(OptionBuilder
+        .withDescription("Use read-uncommitted isolation for imports")
+        .withLongOpt(RELAXED_ISOLATION)
         .create());
 
     return commonOpts;
@@ -823,6 +829,9 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       // Only consider HADOOP_HOME if HADOOP_MAPRED_HOME is not set
     } else if (in.hasOption(HADOOP_HOME_ARG)) {
         out.setHadoopMapRedHome(in.getOptionValue(HADOOP_HOME_ARG));
+    }
+    if (in.hasOption(RELAXED_ISOLATION)) {
+      out.setRelaxedIsolation(true);
     }
   }
 
