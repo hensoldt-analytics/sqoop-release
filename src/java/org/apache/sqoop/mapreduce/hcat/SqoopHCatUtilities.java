@@ -52,13 +52,13 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hcatalog.common.HCatConstants;
-import org.apache.hcatalog.data.DefaultHCatRecord;
-import org.apache.hcatalog.data.schema.HCatFieldSchema;
-import org.apache.hcatalog.data.schema.HCatSchema;
-import org.apache.hcatalog.mapreduce.HCatInputFormat;
-import org.apache.hcatalog.mapreduce.HCatOutputFormat;
-import org.apache.hcatalog.mapreduce.OutputJobInfo;
+import org.apache.hive.hcatalog.common.HCatConstants;
+import org.apache.hive.hcatalog.data.DefaultHCatRecord;
+import org.apache.hive.hcatalog.data.schema.HCatFieldSchema;
+import org.apache.hive.hcatalog.data.schema.HCatSchema;
+import org.apache.hive.hcatalog.mapreduce.HCatInputFormat;
+import org.apache.hive.hcatalog.mapreduce.HCatOutputFormat;
+import org.apache.hive.hcatalog.mapreduce.OutputJobInfo;
 import org.apache.sqoop.config.ConfigurationConstants;
 import org.apache.sqoop.hive.HiveTypes;
 import org.apache.sqoop.manager.ConnManager;
@@ -89,7 +89,7 @@ public final class SqoopHCatUtilities {
   public static final String HCAT_DB_OUTPUT_COLTYPES_SQL =
     "sqoop.hcat.db.output.coltypes.sql";
   public static final String HCAT_CLI_MAIN_CLASS =
-    "org.apache.hcatalog.cli.HCatCli";
+    "org.apache.hive.hcatalog.cli.HCatCli";
   public static final String HCAT_DEF_STORAGE_STANZA = "stored as rcfile";
   public static final String HIVE_DELIMITERS_TO_REPLACE_PROP =
     "sqoop.hive.delims.to.replace";
@@ -864,9 +864,9 @@ public final class SqoopHCatUtilities {
 
       // Let's try Hive 0.11-
       try {
-        shimClass = Class.forName("org.apache.hcatalog.shims.HCatHadoopShims");
+        shimClass = Class.forName("org.apache.hive.hcatalog.shims.HCatHadoopShims");
 
-        Class shimInstanceClass = Class.forName("org.apache.hcatalog.shims.HCatHadoopShims$Instance");
+        Class shimInstanceClass = Class.forName("org.apache.hive.hcatalog.shims.HCatHadoopShims$Instance");
         Method getMethod = shimInstanceClass.getMethod("get");
 
         shimLayer = getMethod.invoke(null);
