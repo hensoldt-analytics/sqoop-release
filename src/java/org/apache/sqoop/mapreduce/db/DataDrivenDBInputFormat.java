@@ -97,6 +97,10 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
     case Types.DOUBLE:
       return new FloatSplitter();
 
+    case Types.NVARCHAR:
+    case Types.NCHAR:
+      return new NTextSplitter();
+
     case Types.CHAR:
     case Types.VARCHAR:
     case Types.LONGVARCHAR:
