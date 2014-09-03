@@ -288,11 +288,18 @@ public final class SqoopHCatUtilities {
     hCatStaticPartitionValues = new ArrayList<String>();
     String partKeysString = options.getHCatalogPartitionKeys();
     String partKeysVals = options.getHCatalogPartitionValues();
+    // Already validated
     if (partKeysString != null) {
       String[] keys = partKeysString.split(",");
-      hCatStaticPartitionKeys.addAll(Arrays.asList(keys));
+      for (int i = 0; i < keys.length; ++i) {
+        String k = keys[i].trim();
+        hCatStaticPartitionKeys.add(k);
+      }
       String[] vals = partKeysVals.split(",");
-      hCatStaticPartitionValues.addAll(Arrays.asList(vals));
+      for (int i = 0; i < vals.length; ++i) {
+        String v = vals[i].trim();
+        hCatStaticPartitionValues.add(v);
+      }
     } else {
       partKeysString = options.getHivePartitionKey();
       if (partKeysString != null) {
