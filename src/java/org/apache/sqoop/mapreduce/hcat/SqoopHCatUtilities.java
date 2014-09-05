@@ -377,8 +377,16 @@ public final class SqoopHCatUtilities {
         throw new IOException("Database column " + col + " not found in "
           + " hcatalog table.");
       }
-      if (hCatStaticPartitionKeys != null
-        && hCatStaticPartitionKeys.equals(col)) {
+      boolean skip=false;
+      if (hCatStaticPartitionKeys != null) {
+        for (String key : hCatStaticPartitionKeys) {
+          if (col.equals(key)) {
+            skip=true;
+            break;
+          }
+        }
+      }
+      if (skip) {
         continue;
       }
       outputFieldList.add(hCatFullTableSchema.get(col));
@@ -677,7 +685,7 @@ public final class SqoopHCatUtilities {
     }
 
     IntWritable[] positions = new IntWritable[hCatFieldPositions.length];
-    for (int i : hCatFieldPositions) {
+    for (int i = 0; i < hCatFieldPositions.length; ++i) {
       positions[i] = new IntWritable(hCatFieldPositions[i]);
     }
 
