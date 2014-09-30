@@ -1,0 +1,54 @@
+  <project name="nexus-deploy" default="windows-stage" basedir="." 
+  xmlns:artifact="urn:maven-artifact-ant">
+    <import file="build.xml" as="apache"/>
+    
+    <macrodef name="windowsnexus-plugin" 
+        description="macro definition for publishing artifacts to nexus">
+        <attribute name="maven-jar"/>
+        <attribute name="attachas" default=""/>
+        <attribute name="pomname" default=""/>
+        <sequential>
+          <artifact:mvn mavenHome="${env.MAVEN_HOME}" fork="true">
+            <arg value="org.apache.maven.plugins:maven-deploy-plugin:2.8.2:deploy-file"/>
+            <arg value="-Durl=${staging_repo_url}"/>
+            <arg value="-DrepositoryId=${staging_repo_id}"/>
+            <arg value="-Dfile=@{maven-jar}"/>
+            <arg value="-Dpackaging=jar"/>
+            <arg value="-DpomFile=@{pomname}"/>
+            <arg value="-Dclassifier=@{attachas}"/>
+            <arg value="-Dtype=jar"/>
+          </artifact:mvn>
+        </sequential>
+     </macrodef>
+
+     <macrodef name="windowsnexus-plugin-no-classifier" 
+         description="macro definition for publishing artifacts to nexus">
+        <attribute name="maven-jar"/>
+        <attribute name="pomname"/>
+        <sequential>
+          <artifact:mvn mavenHome="${env.MAVEN_HOME}" fork="true">
+            <arg value="org.apache.maven.plugins:maven-deploy-plugin:2.8.2:deploy-file"/>
+            <arg value="-Durl=${staging_repo_url}"/>
+            <arg value="-DrepositoryId=${staging_repo_id}"/>
+            <arg value="-Dfile=@{maven-jar}"/>
+            <arg value="-Dpackaging=jar"/>
+            <arg value="-DpomFile=@{pomname}"/>
+            <arg value="-Dtype=jar"/>
+          </artifact:mvn>
+        </sequential>
+      </macrodef>
+
+     <target name="windows-stage" depends="apache.mvn-prep, apache.jar-all, apache.srcjars" 
+          description="deploy artifact to a nexus repository">
+          <windowsnexus-plugin-no-classifier maven-jar="${build.dir}/${dest.jar}" 
+              pomname="${sqoop.pom}"/>
+       <windowsnexus-plugin 
+           maven-jar="${build.srcjar.dir}/${artifact.name}-sources.jar" 
+           pomname="${sqoop.pom}" attachas="sources"/>
+       <windowsnexus-plugin-no-classifier 
+           maven-jar="${build.dir}/${test.jar}" pomname="${sqooptest.pom}"/>
+       <windowsnexus-plugin 
+           maven-jar="${build.srcjar.dir}/${name}-test-${version}-sources.jar" 
+           pomname="${sqooptest.pom}" attachas="sources"/>
+     </target>
+   </project>
