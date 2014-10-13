@@ -1036,7 +1036,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       } catch (IOException ex) {
         LOG.warn("Failed to load password file", ex);
         throw (InvalidOptionsException)
-        new InvalidOptionsException("Error while loading password file: "
+          new InvalidOptionsException("Error while loading password file: "
             + ex.getMessage()).initCause(ex);
       }
     }

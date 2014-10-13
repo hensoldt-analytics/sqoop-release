@@ -111,10 +111,10 @@ public class CredentialProviderHelper {
       String pass = new String(cred);
       return pass;
     } catch (InvocationTargetException ite) {
-      throw new IOException("Error resolving password "
+      throw new RuntimeException("Error resolving password "
         + " from the credential providers ", ite.getTargetException());
     } catch (IllegalAccessException iae) {
-      throw new IOException("Error invoking the credential provider method",
+      throw new RuntimeException("Error invoking the credential provider method",
         iae);
     }
   }
@@ -126,7 +126,7 @@ public class CredentialProviderHelper {
     String alias, String credential) throws IOException {
 
     if (!isProviderAvailable()) {
-      throw new IOException("CredentialProvider facility not available "
+      throw new RuntimeException("CredentialProvider facility not available "
         + "in the hadoop environment");
     }
 
@@ -141,10 +141,10 @@ public class CredentialProviderHelper {
         alias, credential.toCharArray() });
       methFlush.invoke(provider, new Object[] {});
     } catch (InvocationTargetException ite) {
-      throw new IOException("Error creating credential entry "
+      throw new RuntimeException("Error creating credential entry "
         + " using the credentail provider", ite.getTargetException());
     } catch (IllegalAccessException iae) {
-      throw new IOException("Error accessing the credential create method",
+      throw new RuntimeException("Error accessing the credential create method",
         iae);
     }
   }

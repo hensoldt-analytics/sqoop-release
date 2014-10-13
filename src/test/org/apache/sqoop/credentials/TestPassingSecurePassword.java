@@ -98,9 +98,10 @@ public class TestPassingSecurePassword extends BaseSqoopTestCase {
       SqoopOptions opts = getSqoopOptions(conf);
       ImportTool importTool = new ImportTool();
       importTool.parseArguments(argv, conf, opts, true);
-      fail("The password file does not exist! ");
+      fail("The password file does not exist!");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("The password file does not exist!"));
+      assertTrue(e.getMessage().matches(".*The provided password file "
+        + ".* does not exist!"));
     }
   }
 
@@ -115,10 +116,10 @@ public class TestPassingSecurePassword extends BaseSqoopTestCase {
       SqoopOptions opts = getSqoopOptions(conf);
       ImportTool importTool = new ImportTool();
       importTool.parseArguments(argv, conf, opts, true);
-      fail("The password file cannot be a directory! ");
+      fail("The password file cannot be a directory!");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("The password file cannot "
-        + "be a directory!"));
+      assertTrue(e.getMessage().matches(".*The provided password file .*"
+        + " is a directory!"));
     }
   }
 
@@ -142,7 +143,8 @@ public class TestPassingSecurePassword extends BaseSqoopTestCase {
       SqoopOptions out = importTool.parseArguments(argv, conf, in, true);
       assertNotNull(out.getPassword());
       importTool.validateOptions(out);
-      fail("Either password or passwordPath must be specified but not both.");
+      fail("Only one of password, password "
+          + "alias or path to a password file must be specified.");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Only one of password, password "
           + "alias or path to a password file must be specified."));
@@ -374,10 +376,8 @@ public class TestPassingSecurePassword extends BaseSqoopTestCase {
       File credDir = new File(".");
 
       Configuration conf = getConf();
-      String ourUrl =  CredentialProviderHelper.SCHEME_NAME
-          + "://file/" + credDir.getAbsolutePath().replaceAll("\\\\", "/")
-          + "/" + jksFile;
-
+      String ourUrl =  CredentialProviderHelper.SCHEME_NAME +
+        "://file/" + credDir.getAbsolutePath() + "/" + jksFile;
       File file = new File(credDir, jksFile);
       file.delete();
       conf.set(CredentialProviderHelper.CREDENTIAL_PROVIDER_PATH,
@@ -417,10 +417,8 @@ public class TestPassingSecurePassword extends BaseSqoopTestCase {
       File credDir = new File(".");
 
       Configuration conf = getConf();
-      String ourUrl =  CredentialProviderHelper.SCHEME_NAME
-        + "://file/" + credDir.getAbsolutePath().replaceAll("\\\\", "/")
-        + "/" + jksFile;
-
+      String ourUrl =  CredentialProviderHelper.SCHEME_NAME +
+        "://file/" + credDir.getAbsolutePath() + "/" + jksFile;
       File file = new File(credDir, jksFile);
       file.delete();
       conf.set(CredentialProviderHelper.CREDENTIAL_PROVIDER_PATH,
