@@ -51,4 +51,58 @@
            maven-jar="${build.srcjar.dir}/${name}-test-${version}-sources.jar" 
            pomname="${sqooptest.pom}" attachas="sources"/>
      </target>
+   
+     <macrodef name="nexus-plugin"
+        description="macro definition for publishing artifacts to nexus">
+        <attribute name="maven-jar"/>
+        <attribute name="attachas" default=""/>
+        <attribute name="pomname" default=""/>
+        <sequential>
+          <artifact:mvn mavenHome="${env.MAVEN_HOME}" fork="true">
+            <arg value="org.apache.maven.plugins:maven-deploy-plugin:2.8.2:deploy-file"/>
+            <arg value="-Durl=${staging_repo_url}"/>
+            <arg value="-DrepositoryId=${staging_repo_id}"/>
+            <arg value="-Dfile=@{maven-jar}"/>
+            <arg value="-Dpackaging=jar"/>
+            <arg value="-DpomFile=@{pomname}"/>
+            <arg value="-Dclassifier=@{attachas}"/>
+            <arg value="-Dtype=jar"/>
+            <arg value="-Pgpg"/>
+            <arg value="-s${settings_xml}"/>
+          </artifact:mvn>
+        </sequential>
+     </macrodef>
+
+     <macrodef name="nexus-plugin-no-classifier"
+         description="macro definition for publishing artifacts to nexus">
+        <attribute name="maven-jar"/>
+        <attribute name="pomname"/>
+        <sequential>
+          <artifact:mvn mavenHome="${env.MAVEN_HOME}" fork="true">
+            <arg value="org.apache.maven.plugins:maven-deploy-plugin:2.8.2:deploy-file"/>
+            <arg value="-Durl=${staging_repo_url}"/>
+            <arg value="-DrepositoryId=${staging_repo_id}"/>
+            <arg value="-Dfile=@{maven-jar}"/>
+            <arg value="-Dpackaging=jar"/>
+            <arg value="-DpomFile=@{pomname}"/>
+            <arg value="-Dtype=jar"/>
+            <arg value="-Pgpg"/>
+            <arg value="-s${settings_xml}"/>
+          </artifact:mvn>
+        </sequential>
+      </macrodef>
+    
+     <target name="stage" depends="apache.mvn-install, apache.tar"
+          description="deploy artifact to a nexus repository">
+          <nexus-plugin-no-classifier maven-jar="${build.dir}/${dest.jar}"
+              pomname="${sqoop.pom}"/>
+       <nexus-plugin
+           maven-jar="${build.srcjar.dir}/${artifact.name}-sources.jar"
+           pomname="${sqoop.pom}" attachas="sources"/>
+       <nexus-plugin-no-classifier
+           maven-jar="${build.dir}/${test.jar}" pomname="${sqooptest.pom}"/>
+       <nexus-plugin
+           maven-jar="${build.srcjar.dir}/${name}-test-${version}-sources.jar"
+           pomname="${sqooptest.pom}" attachas="sources"/>
+     </target>
    </project>
