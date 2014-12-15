@@ -1238,7 +1238,8 @@
     <echo message="Release audit report: ${build.dir}/rat.log" />
   </target>
 
-  <target name="mvn-prep" depends="init,ivy-resolve-test">
+  <target name="mvn-prep" depends="init,ivy-resolve-test" unless="mvn-prep.initialized">
+    <property name="mvn-prep.initialized" value="true" />
     <!-- prepare for mvn tasks. -->
 
     <!-- Download maven -->
