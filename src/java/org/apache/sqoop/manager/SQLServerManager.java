@@ -28,6 +28,7 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.sqoop.mapreduce.JdbcUpsertExportJob;
 import org.apache.sqoop.mapreduce.SQLServerResilientExportOutputFormat;
 import org.apache.sqoop.mapreduce.SQLServerResilientUpdateOutputFormat;
 import org.apache.sqoop.mapreduce.db.SQLServerDBInputFormat;
@@ -42,6 +43,7 @@ import com.cloudera.sqoop.util.ImportException;
 import org.apache.sqoop.cli.RelatedOptions;
 import org.apache.sqoop.mapreduce.sqlserver.SqlServerExportBatchOutputFormat;
 import org.apache.sqoop.mapreduce.sqlserver.SqlServerInputFormat;
+import org.apache.sqoop.mapreduce.sqlserver.SqlServerUpsertOutputFormat;
 
 /**
  * Manages connections to SQLServer databases. Requires the SQLServer JDBC
@@ -61,6 +63,11 @@ public class SQLServerManager
   // Option set in extra-arguments to disable resiliency and use default mode
   public static final String NON_RESILIENT_OPTION = "non-resilient";
 
+  // Option to allow inserts on identity columns
+  public static final String IDENTITY_INSERT = "identity-insert";
+  public static final String IDENTITY_INSERT_PROP =
+      "org.apache.sqoop.manager.sqlserver.table.identity";
+
   // driver class to ensure is loaded when making db connection.
   private static final String DRIVER_CLASS =
       "com.microsoft.sqlserver.jdbc.SQLServerDriver";
@@ -77,6 +84,11 @@ public class SQLServerManager
    * Optional table hints to use.
    */
   private String tableHints;
+
+  /**
+   * Whether to allow identity inserts.
+   */
+  private boolean identityInserts;
 
   public SQLServerManager(final SqoopOptions opts) {
     super(DRIVER_CLASS, opts);
@@ -160,6 +172,10 @@ public class SQLServerManager
     if (tableHints != null) {
       configuration.set(TABLE_HINTS_PROP, tableHints);
     }
+
+    // Propagate whether to allow identity inserts to job
+    configuration.setBoolean(IDENTITY_INSERT_PROP, identityInserts);
+
     JdbcExportJob exportJob;
     if (isNonResilientOperation()) {
       exportJob = new JdbcExportJob(context, null, null,
@@ -187,6 +203,39 @@ public class SQLServerManager
         null, SQLServerResilientUpdateOutputFormat.class);
       configureConnectionRecoveryForUpdate(context);
       exportJob.runExport();
+    }
+  }
+
+  @Override
+  /**
+   * {@inheritDoc}
+   */
+  public void upsertTable(com.cloudera.sqoop.manager.ExportJobContext context)
+      throws IOException, ExportException {
+    context.setConnManager(this);
+
+    // Propagate table hints to job
+    Configuration configuration = context.getOptions().getConf();
+    if (tableHints != null) {
+      configuration.set(TABLE_HINTS_PROP, tableHints);
+    }
+
+    JdbcUpsertExportJob exportJob =
+        new JdbcUpsertExportJob(context, SqlServerUpsertOutputFormat.class);
+    exportJob.runExport();
+  }
+
+  @Override
+  /**
+   * {@inheritDoc}
+   */
+  public void configureDbOutputColumns(SqoopOptions options) {
+    if (options.getUpdateMode() == SqoopOptions.UpdateMode.UpdateOnly) {
+      super.configureDbOutputColumns(options);
+    } else {
+      // We're in upsert mode. We need to explicitly set
+      // the database output column ordering in the codeGenerator.
+      options.setDbOutputColumns(getColumnNames(options.getTableName()));
     }
   }
 
@@ -303,6 +352,8 @@ public class SQLServerManager
 
       this.tableHints = hints;
     }
+
+    identityInserts = cmdLine.hasOption(IDENTITY_INSERT);
   }
 
   /**
@@ -323,6 +374,10 @@ public class SQLServerManager
     extraOptions.addOption(OptionBuilder.withArgName("string").hasArg()
       .withDescription("Optional table hints to use")
       .withLongOpt(TABLE_HINTS).create());
+
+    extraOptions.addOption(OptionBuilder
+      .withDescription("Allow identity inserts")
+      .withLongOpt(IDENTITY_INSERT).create());
 
     return extraOptions;
   }

@@ -136,9 +136,27 @@ public class HBaseImportJob extends DataDrivenImportJob {
       throw new ImportException(
           "Import to HBase error: Column family not specified");
     }
+    Method m = null;
+    try {
+      m = HBaseConfiguration.class.getMethod("merge",
+      Configuration.class, Configuration.class);
+    } catch (NoSuchMethodException nsme) {
+    }
+ 
+    if (m != null) {
+      // Add HBase configuration files to this conf object.
 
-    // Add HBase configuration files to this conf object.
-    HBaseConfiguration.addHbaseResources(conf);
+      Configuration newConf = HBaseConfiguration.create(conf);
+      try {
+        m.invoke(null, conf, newConf);
+      } catch (Exception e) {
+        throw new ImportException(e);
+      }
+    } else {
+     // Add HBase configuration files to this conf object.
+      HBaseConfiguration.addHbaseResources(conf);
+    }
+ 
 
     HBaseAdmin admin = new HBaseAdmin(conf);
 
