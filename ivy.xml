@@ -301,7 +301,7 @@ under the License.
       rev="${postgresql.version}" conf="common->default" />
 
     <dependency org="org.apache.zookeeper" name="zookeeper"
-      rev="${zookeeper.version}" conf="common->default">
+      rev="${zookeeper.version}" conf="test->default">
       <artifact name="zookeeper" type="jar" />
     </dependency>
 
