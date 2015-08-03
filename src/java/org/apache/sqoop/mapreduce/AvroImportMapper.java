@@ -40,6 +40,8 @@ import com.cloudera.sqoop.lib.ClobRef;
 import com.cloudera.sqoop.lib.LargeObjectLoader;
 import com.cloudera.sqoop.lib.SqoopRecord;
 import com.cloudera.sqoop.mapreduce.AutoProgressMapper;
+import org.apache.sqoop.orm.AvroSchemaGenerator;
+import org.apache.sqoop.orm.ClassWriter;
 
 /**
  * Imports records by transforming them to Avro records in an Avro data file.
@@ -88,11 +90,19 @@ public class AvroImportMapper
     }
   }
 
+  private static String toAvroColumn(String column) {
+    String candidate = ClassWriter.toJavaIdentifier(column);
+    return AvroSchemaGenerator.toAvroIdentifier(candidate);
+  }
+
+
+
   private GenericRecord toGenericRecord(SqoopRecord val) {
     Map<String, Object> fieldMap = val.getFieldMap();
     GenericRecord record = new GenericData.Record(schema);
     for (Map.Entry<String, Object> entry : fieldMap.entrySet()) {
-      record.put(entry.getKey(), toAvro(entry.getValue()));
+      String avroColumn = toAvroColumn(entry.getKey());
+      record.put(avroColumn, toAvro(entry.getValue()));
     }
     return record;
   }

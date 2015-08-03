@@ -100,6 +100,14 @@ public class AvroSchemaGenerator {
     return toAvroSchema(sqlType, null);
   }
 
+  public static String toAvroIdentifier(String candidate) {
+    String formattedCandidate = candidate.replaceAll("\\W+", "");
+    if (formattedCandidate.substring(0,1).matches("[a-zA-Z_]")) {
+      return formattedCandidate;
+    } else {
+      return "AVRO_" + formattedCandidate;
+    }
+  }
   private Type toAvroType(String columnName, int sqlType) {
     Properties mapping = options.getMapColumnJava();
 
