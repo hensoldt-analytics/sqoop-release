@@ -184,4 +184,24 @@ public final class OptionsFileUtil {
 
     return option;
   }
+
+  public static String[] expandSqoopDefaultCmdOpt(String[] args, String cmdOpts) {
+    // Add Sqoop options environment variable contents to the command line
+    String[] combinedArgs = args;
+    if (cmdOpts != null && !cmdOpts.isEmpty()) {
+      // split the command line option
+      String[] envArgs = cmdOpts.split("\\s");
+      if (args == null) {
+        return envArgs;
+      }
+      combinedArgs = new String[args.length + envArgs.length];
+      for (int i = 0; i < args.length; ++i) {
+        combinedArgs[i] = args[i];
+      }
+      for (int i = 0; i < envArgs.length; ++i) {
+        combinedArgs[args.length + i] = envArgs[i];
+      }
+    }
+    return combinedArgs;
+  }
 }
