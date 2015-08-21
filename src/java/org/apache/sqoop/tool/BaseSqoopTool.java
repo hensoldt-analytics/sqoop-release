@@ -105,6 +105,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String HIVE_TABLE_ARG = "hive-table";
   public static final String HIVE_DATABASE_ARG = "hive-database";
   public static final String HIVE_OVERWRITE_ARG = "hive-overwrite";
+  public static final String HIVE_COMPUTE_STATS_ARG = "hive-compute-stats";
   public static final String HIVE_DROP_DELIMS_ARG = "hive-drop-import-delims";
   public static final String HIVE_DELIMS_REPLACEMENT_ARG =
           "hive-delims-replacement";
@@ -493,6 +494,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         .withDescription("Overwrite existing data in the Hive table")
         .withLongOpt(HIVE_OVERWRITE_ARG)
         .create());
+    hiveOpts.addOption(OptionBuilder
+      .withDescription("Overwrite existing data in the Hive table")
+      .withLongOpt(HIVE_COMPUTE_STATS_ARG)
+      .create());
     hiveOpts.addOption(OptionBuilder
         .withDescription("Fail if the target hive table exists")
         .withLongOpt(CREATE_HIVE_TABLE_ARG)
@@ -1083,6 +1088,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
 
     if (in.hasOption(HIVE_OVERWRITE_ARG)) {
       out.setOverwriteHiveTable(true);
+    }
+
+    if (in.hasOption(HIVE_COMPUTE_STATS_ARG)) {
+      out.setComputeStatsHiveTable(true);
     }
 
     if (in.hasOption(CREATE_HIVE_TABLE_ARG)) {
