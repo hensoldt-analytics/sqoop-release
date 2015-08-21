@@ -188,6 +188,7 @@ public class HiveImport {
         configuration, !debugMode);
     String createTableStr = tableWriter.getCreateTableStmt() + ";\n";
     String loadDataStmtStr = tableWriter.getLoadDataStmt() + ";\n";
+    String computeStatsStmtStr = tableWriter.getComputeStatsStmt();
     Path finalPath = tableWriter.getFinalPath();
 
     if (!isGenerateOnly()) {
@@ -221,6 +222,10 @@ public class HiveImport {
         w.write(createTableStr, 0, createTableStr.length());
         if (!createOnly) {
           w.write(loadDataStmtStr, 0, loadDataStmtStr.length());
+          if (computeStatsStmtStr != null) {
+            computeStatsStmtStr += ";\n";
+            w.write(computeStatsStmtStr, 0, computeStatsStmtStr.length());
+          }
         }
       } catch (IOException ioe) {
         LOG.error("Error writing Hive load-in script: " + ioe.toString());

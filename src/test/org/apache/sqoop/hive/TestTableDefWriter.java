@@ -286,4 +286,34 @@ public class TestTableDefWriter {
     assertTrue(createTable.contains("`db`.`outputTable`"));
   }
 
+  @Test
+  public void testHiveComputeStats() throws Exception {
+    String[] args = {
+      "--hive-database",
+      "db",
+      "--hive-compute-stats",
+    };
+    Configuration conf = new Configuration();
+    SqoopOptions options =
+      new ImportTool().parseArguments(args, null, null, false);
+    TableDefWriter writer = new TableDefWriter(options,
+        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
+
+    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
+    writer.setColumnTypes(colTypes);
+
+    String createTable = writer.getCreateTableStmt();
+    assertNotNull(createTable);
+    assertTrue(createTable.contains("`db`.`outputTable`"));
+
+    String loadStmt = writer.getLoadDataStmt();
+    assertNotNull(loadStmt);
+    assertTrue(createTable.contains("`db`.`outputTable`"));
+
+    String computeStatsStmt = writer.getComputeStatsStmt();
+    LOG.info("Compute stats stmt " + computeStatsStmt);
+    assertNotNull(computeStatsStmt);
+    assertTrue(computeStatsStmt.length() > 0);
+    assertTrue(computeStatsStmt.matches("ANALYZE TABLE `db`.`outputTable`.*COMPUTE STATISTICS"));
+  }
 }
