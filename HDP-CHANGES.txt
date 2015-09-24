@@ -6,6 +6,7 @@
 
  IMPROVEMENTS
    SQOOP-2370: Netezza - need to support additional options for full control character handling
-
+   SQOOP-2387: Sqoop should support importing from table with column names containing some special character
+   SQOOP-2457: Add option to automatically compute statistics after loading date into a hive table
  BUG FIXES
    SQOOP-2364: Fix Netezza trunc-string option handling and unnecessary log directory during imports
