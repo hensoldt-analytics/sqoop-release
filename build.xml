@@ -497,11 +497,11 @@
     </copy>
 
     <!-- copy the test artifact -->
-    <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
+    <!--copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
       <fileset dir="${build.dir}">
         <include name="${test.jar}" />
       </fileset>
-    </copy>
+    </copy-->
 
     <!-- copy in various components of the initial source layout
          so that the redistributable can bootstrap itself. -->
