@@ -10,3 +10,4 @@
    SQOOP-2457: Add option to automatically compute statistics after loading date into a hive table
  BUG FIXES
    SQOOP-2364: Fix Netezza trunc-string option handling and unnecessary log directory during imports
+   SQOOP-2399: Sqoop import into Hbase - BigDecimalSplitter java.lang.ArrayIndexOutOfBoundsException
