@@ -19,6 +19,7 @@
 package org.apache.sqoop;
 
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -90,6 +91,9 @@ public class SqoopJobDataPublisher {
             this.storeTable = storeTable;
             this.storeQuery = storeQuery;
             this.hiveDB = hiveDB;
+            if (this.hiveDB == null) {
+                this.hiveDB =   SqoopHCatUtilities.DEFHCATDB;
+            }
             this.hiveTable = hiveTable;
             this.commandLineOpts = commandLineOpts;
             this.startTime = startTime;
