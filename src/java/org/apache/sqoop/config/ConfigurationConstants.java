@@ -95,6 +95,12 @@ public final class ConfigurationConstants {
    */
   public static final String MAPRED_DISTCACHE_CONF_PARAM = "tmpjars";
 
+  /**
+   * The Configuration property identifying data publisher class.
+   */
+  public static final String DATA_PUBLISH_CLASS = "sqoop.job.data.publish.class";
+
+
   private ConfigurationConstants() {
     // Disable Explicit Object Creation
   }
