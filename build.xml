@@ -985,7 +985,7 @@
 
     <delete dir="${test.log.dir}"/>
     <mkdir dir="${test.log.dir}"/>
-    <delete dir="${build.test}/data"/>
+    <delete dir="${build.test}/data/*"/>
     <mkdir dir="${build.test}/data/sqoop" />
     <mkdir dir="${cobertura.class.dir}" />
     <copy file="${test.dir}/fi-site.xml"
