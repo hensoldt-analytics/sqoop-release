@@ -233,31 +233,6 @@ public class TestParquetImport extends ImportJobTestCase {
     }
   }
 
-  public void testNonIdentCharactersInColumnName() throws IOException {
-    String [] names = { "test_p-a+r/quet" };
-    String [] types = { "INT" };
-    String [] vals = { "2015" };
-    createTableWithColTypesAndNames(names, types, vals);
-
-    runImport(getOutputArgv(true, null));
-
-    Schema schema = getSchema();
-    assertEquals(Type.RECORD, schema.getType());
-    List<Field> fields = schema.getFields();
-    assertEquals(types.length, fields.size());
-    checkField(fields.get(0), "TEST_P_A_R_QUET", Type.INT);
-
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      assertTrue(reader.hasNext());
-      GenericRecord record1 = reader.next();
-      assertEquals("TEST_P_A_R_QUET", 2015, record1.get("TEST_P_A_R_QUET"));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
-  }
-
   public void testNullableParquetImport() throws IOException, SQLException {
     String [] types = { "INT" };
     String [] vals = { null };

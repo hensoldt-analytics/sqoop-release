@@ -75,6 +75,7 @@ public class AvroSchemaGenerator {
   }
 
   // Backward compatible method SQOOP-2597
+  public Schema generate() throws IOException {
     return generate(null);
   }
 
