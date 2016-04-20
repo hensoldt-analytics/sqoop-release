@@ -20,7 +20,9 @@ package org.apache.sqoop;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -33,6 +35,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.sqoop.accumulo.AccumuloConstants;
 import org.apache.sqoop.util.CredentialsUtil;
 import org.apache.sqoop.util.LoggingUtils;
+import org.apache.sqoop.util.SqoopJsonUtil;
 import org.apache.sqoop.util.password.CredentialProviderHelper;
 import org.apache.sqoop.validation.AbortOnFailureHandler;
 import org.apache.sqoop.validation.AbsoluteValidationThreshold;
@@ -51,6 +54,8 @@ import com.cloudera.sqoop.util.StoredAsProperty;
  * Configurable state used by Sqoop tools.
  */
 public class SqoopOptions implements Cloneable {
+
+  private static final String OLD_SQOOP_TEST_IMPORT_ROOT_DIR = "sqoop.test.import.rootDir";
 
   public static final Log LOG = LogFactory.getLog(SqoopOptions.class.getName());
 
@@ -89,6 +94,9 @@ public class SqoopOptions implements Cloneable {
     }
   }
 
+  @StoredAsProperty("customtool.options.jsonmap")
+  private Map<String, String> customToolOptions;
+
   // TODO(aaron): Adding something here? Add a setter and a getter.  Add a
   // default value in initDefaults() if you need one.  If this value needs to
   // be serialized in the metastore, it should be marked with
@@ -99,6 +107,8 @@ public class SqoopOptions implements Cloneable {
   // are stored as constants in BaseSqoopTool.
 
   @StoredAsProperty("verbose") private boolean verbose;
+
+  @StoredAsProperty("temporary.dirRoot") private String tempRootDir;
 
   @StoredAsProperty("mapreduce.job.name") private String mapreduceJobName;
 
@@ -136,6 +146,7 @@ public class SqoopOptions implements Cloneable {
   @StoredAsProperty("codegen.auto.compile.dir") private boolean jarDirIsAuto;
   private String hadoopMapRedHome; // not serialized to metastore.
   @StoredAsProperty("db.split.column") private String splitByCol;
+  @StoredAsProperty("split.limit") private Integer splitLimit;
   @StoredAsProperty("db.where.clause") private String whereClause;
   @StoredAsProperty("db.query") private String sqlQuery;
   @StoredAsProperty("db.query.boundary") private String boundaryQuery;
@@ -167,6 +178,8 @@ public class SqoopOptions implements Cloneable {
   private String hCatDatabaseName;
   @StoredAsProperty("hcatalog.create.table")
   private boolean hCatCreateTable;
+  @StoredAsProperty("hcatalog.drop.and.create.table")
+  private boolean hCatDropAndCreateTable;
   @StoredAsProperty("hcatalog.storage.stanza")
   private String hCatStorageStanza;
   private String hCatHome; // not serialized to metastore.
@@ -225,6 +238,7 @@ public class SqoopOptions implements Cloneable {
   private boolean areInputDelimsManuallySet;
 
   private Configuration conf;
+  private String toolName;
 
   public static final int DEFAULT_NUM_MAPPERS = 4;
 
@@ -611,6 +625,9 @@ public class SqoopOptions implements Cloneable {
           } else if (typ.isEnum()) {
             f.set(this, Enum.valueOf(typ,
                 props.getProperty(propName, f.get(this).toString())));
+          }  else if (typ.equals(Map.class)) {
+            f.set(this,
+                SqoopJsonUtil.getMapforJsonString(props.getProperty(propName)));
           } else {
             throw new RuntimeException("Could not retrieve property "
                 + propName + " for type: " + typ);
@@ -729,6 +746,11 @@ public class SqoopOptions implements Cloneable {
                 f.get(this) == null ? "null" : f.get(this).toString());
           } else if (typ.isEnum()) {
             putProperty(props, propName, f.get(this).toString());
+          } else if (typ.equals(Map.class)) {
+            putProperty(
+                props,
+                propName,
+                SqoopJsonUtil.getJsonStringforMap((Map) f.get(this)));
           } else {
             throw new RuntimeException("Could not set property "
                 + propName + " for type: " + typ);
@@ -990,6 +1012,10 @@ public class SqoopOptions implements Cloneable {
 
     // We do not want to be verbose too much if not explicitly needed
     this.verbose = false;
+    //This name of the system property is intentionally OLD_SQOOP_TEST_IMPORT_ROOT_DIR
+    //to support backward compatibility. Do not exchange it with
+    //org.apache.sqoop.tool.BaseSqoopTool#TEMP_ROOTDIR_ARG
+    this.tempRootDir = System.getProperty(OLD_SQOOP_TEST_IMPORT_ROOT_DIR, "_sqoop");
     this.isValidationEnabled = false; // validation is disabled by default
     this.validatorClass = RowCountValidator.class;
     this.validationThresholdClass = AbsoluteValidationThreshold.class;
@@ -1093,6 +1119,14 @@ public class SqoopOptions implements Cloneable {
     this.verbose = beVerbose;
   }
 
+  public String getTempRootDir() {
+    return tempRootDir;
+  }
+
+  public void setTempRootDir(String tempRootDir) {
+    this.tempRootDir = tempRootDir;
+  }
+
   /**
    * Get the temporary directory; guaranteed to end in File.separator
    * (e.g., '/').
@@ -1161,6 +1195,17 @@ public class SqoopOptions implements Cloneable {
     }
   }
 
+  public String getColumnNameCaseInsensitive(String col){
+    if (null != columns) {
+      for(String columnName : columns) {
+        if(columnName.equalsIgnoreCase(col)) {
+          return columnName;
+        }
+      }
+    }
+    return null;
+  }
+
   public void setColumns(String [] cols) {
     if (null == cols) {
       this.columns = null;
@@ -1175,6 +1220,14 @@ public class SqoopOptions implements Cloneable {
 
   public void setSplitByCol(String splitBy) {
     this.splitByCol = splitBy;
+  }
+
+  public Integer getSplitLimit() {
+    return splitLimit;
+  }
+
+  public void setSplitLimit(Integer splitLimit) {
+    this.splitLimit = splitLimit;
   }
 
   public String getWhereClause() {
@@ -1215,6 +1268,7 @@ public class SqoopOptions implements Cloneable {
   protected void parseColumnMapping(String mapping,
           Properties output) {
     output.clear();
+
     String[] maps = mapping.split(",");
     for(String map : maps) {
       String[] details = map.split("=");
@@ -1222,7 +1276,15 @@ public class SqoopOptions implements Cloneable {
         throw new IllegalArgumentException("Malformed mapping.  "
             + "Column mapping should be the form key=value[,key=value]*");
       }
-      output.put(details[0], details[1]);
+
+      try {
+        output.put(
+            URLDecoder.decode(details[0], "UTF-8"),
+            URLDecoder.decode(details[1], "UTF-8"));
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalArgumentException("Encoding not supported. "
+            + "Column mapping should be UTF-8 encoding.");
+      }
     }
   }
 
@@ -1443,6 +1505,14 @@ public class SqoopOptions implements Cloneable {
 
   public void setCreateHCatalogTable(boolean create) {
     this.hCatCreateTable = create;
+  }
+
+  public boolean doDropAndCreateHCatalogTable() {
+    return hCatDropAndCreateTable;
+  }
+
+  public void setDropAndCreateHCatalogTable(boolean dropAndCreate) {
+    this.hCatDropAndCreateTable = dropAndCreate;
   }
 
   public void setHCatStorageStanza(String stanza) {
@@ -2556,4 +2626,20 @@ public class SqoopOptions implements Cloneable {
   public void setHCatalogPartitionValues(String hpvs) {
     this.hCatalogPartitionValues = hpvs;
   }
+
+  public Map<String, String> getCustomToolOptions() {
+    return customToolOptions;
+  }
+
+  public void setCustomToolOptions(Map<String, String> customToolOptions) {
+    this.customToolOptions = customToolOptions;
+  }
+
+    public String getToolName() {
+        return this.toolName;
+    }
+
+    public void setToolName(String toolName) {
+        this.toolName = toolName;
+    }
 }

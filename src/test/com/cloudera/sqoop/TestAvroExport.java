@@ -27,14 +27,18 @@ import com.google.common.collect.Lists;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.avro.Conversions;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileWriter;
@@ -161,10 +165,12 @@ public class TestAvroExport extends ExportJobTestCase {
     fields.add(buildAvroField("id", Schema.Type.INT));
     fields.add(buildAvroField("msg", Schema.Type.STRING));
     int colNum = 0;
-    for (ColumnGenerator gen : extraCols) {
-      if (gen.getColumnAvroSchema() != null) {
-        fields.add(buildAvroField(forIdx(colNum++),
-            gen.getColumnAvroSchema()));
+    // Issue [SQOOP-2846]
+    if (null != extraCols) {
+      for (ColumnGenerator gen : extraCols) {
+        if (gen.getColumnAvroSchema() != null) {
+          fields.add(buildAvroField(forIdx(colNum++), gen.getColumnAvroSchema()));
+        }
       }
     }
     Schema schema = Schema.createRecord("myschema", null, null, false);
@@ -175,9 +181,12 @@ public class TestAvroExport extends ExportJobTestCase {
   private void addExtraColumns(GenericRecord record, int rowNum,
       ColumnGenerator[] extraCols) {
     int colNum = 0;
-    for (ColumnGenerator gen : extraCols) {
-      if (gen.getColumnAvroSchema() != null) {
-        record.put(forIdx(colNum++), gen.getExportValue(rowNum));
+    // Issue [SQOOP-2846]
+    if (null != extraCols) {
+      for (ColumnGenerator gen : extraCols) {
+        if (gen.getColumnAvroSchema() != null) {
+          record.put(forIdx(colNum++), gen.getExportValue(rowNum));
+        }
       }
     }
   }
@@ -231,11 +240,11 @@ public class TestAvroExport extends ExportJobTestCase {
     StringBuilder sb = new StringBuilder();
     sb.append("CREATE TABLE ");
     sb.append(getTableName());
-    sb.append(" (id INT NOT NULL PRIMARY KEY, msg VARCHAR(64)");
+    sb.append(" (\"id\" INT NOT NULL PRIMARY KEY, \"msg\" VARCHAR(64)");
     int colNum = 0;
     for (ColumnGenerator gen : extraColumns) {
       if (gen.getColumnType() != null) {
-        sb.append(", " + forIdx(colNum++) + " " + gen.getColumnType());
+        sb.append(", \"" + forIdx(colNum++) + "\" " + gen.getColumnType());
       }
     }
     sb.append(")");
@@ -250,6 +259,39 @@ public class TestAvroExport extends ExportJobTestCase {
     }
   }
 
+  /**
+   * Create the table definition to export and also inserting one records for
+   * identifying the updates. Issue [SQOOP-2846]
+   */
+  private void createTableWithInsert() throws SQLException {
+    Connection conn = getConnection();
+    PreparedStatement statement = conn.prepareStatement(getDropTableStatement(getTableName()),
+        ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+    try {
+      statement.executeUpdate();
+      conn.commit();
+    } finally {
+      statement.close();
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("CREATE TABLE ");
+    sb.append(getTableName());
+    sb.append(" (id INT NOT NULL PRIMARY KEY, msg VARCHAR(64)");
+    sb.append(")");
+    statement = conn.prepareStatement(sb.toString(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+    try {
+      statement.executeUpdate();
+      Statement statement2 = conn.createStatement();
+      String insertCmd = "INSERT INTO " + getTableName() + " (ID,MSG) VALUES(" + 0 + ",'testMsg');";
+      statement2.execute(insertCmd);
+      conn.commit();
+    } finally {
+      statement.close();
+    }
+  }
+
+
   /** Verify that on a given row, a column has a given value.
    * @param id the id column specifying the row to test.
    */
@@ -259,7 +301,7 @@ public class TestAvroExport extends ExportJobTestCase {
     LOG.info("Verifying column " + colName + " has value " + expectedVal);
 
     PreparedStatement statement = conn.prepareStatement(
-        "SELECT " + colName + " FROM " + getTableName() + " WHERE id = " + id,
+        "SELECT \"" + colName + "\" FROM " + getTableName() + " WHERE \"id\" = " + id,
         ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     Object actualVal = null;
     try {
@@ -301,6 +343,8 @@ public class TestAvroExport extends ExportJobTestCase {
   }
 
   public void testSupportedAvroTypes() throws IOException, SQLException {
+    GenericData.get().addLogicalTypeConversion(new Conversions.DecimalConversion());
+
     String[] argv = {};
     final int TOTAL_RECORDS = 1 * 10;
 
@@ -308,6 +352,8 @@ public class TestAvroExport extends ExportJobTestCase {
     Schema fixed = Schema.createFixed("myfixed", null, null, 2);
     Schema enumeration = Schema.createEnum("myenum", null, null,
         Lists.newArrayList("a", "b"));
+    Schema decimalSchema = LogicalTypes.decimal(3,2)
+        .addToSchema(Schema.createFixed("dec1", null, null, 2));
 
     ColumnGenerator[] gens = new ColumnGenerator[] {
       colGenerator(true, Schema.create(Schema.Type.BOOLEAN), true, "BIT"),
@@ -323,6 +369,10 @@ public class TestAvroExport extends ExportJobTestCase {
           b, "BINARY(2)"),
       colGenerator(new GenericData.EnumSymbol(enumeration, "a"), enumeration,
           "a", "VARCHAR(8)"),
+      colGenerator(new BigDecimal("2.00"), decimalSchema,
+          new BigDecimal("2.00"), "DECIMAL(3,2)"),
+      colGenerator("22.00", Schema.create(Schema.Type.STRING),
+          new BigDecimal("22.00"), "DECIMAL(4,2)"),
     };
     createAvroFile(0, TOTAL_RECORDS, gens);
     createTable(gens);
@@ -331,6 +381,26 @@ public class TestAvroExport extends ExportJobTestCase {
     for (int i = 0; i < gens.length; i++) {
       assertColMinAndMax(forIdx(i), gens[i]);
     }
+  }
+
+  public void testPathPatternInExportDir() throws IOException, SQLException {
+    final int TOTAL_RECORDS = 10;
+
+    ColumnGenerator[] gens = new ColumnGenerator[] {
+      colGenerator(true, Schema.create(Schema.Type.BOOLEAN), true, "BIT"),
+    };
+
+    createAvroFile(0, TOTAL_RECORDS, gens);
+    createTable(gens);
+
+    // Converts path to an unary set while preserving the leading '/'
+    String pathPattern = new StringBuilder(getTablePath().toString())
+            .insert(1, "{")
+            .append("}")
+            .toString();
+
+    runExport(getArgv(true, 10, 10, "--export-dir", pathPattern));
+    verifyExport(TOTAL_RECORDS);
   }
 
   public void testNullableField() throws IOException, SQLException {
@@ -387,6 +457,33 @@ public class TestAvroExport extends ExportJobTestCase {
     verifyExport(TOTAL_RECORDS);
   }
 
+  // Test Case for Issue [SQOOP-2846]
+  public void testAvroWithUpsert() throws IOException, SQLException {
+    String[] argv = { "--update-key", "ID", "--update-mode", "allowinsert" };
+    final int TOTAL_RECORDS = 2;
+    // ColumnGenerator gen = colGenerator("100",
+    // Schema.create(Schema.Type.STRING), null, "VARCHAR(64)");
+    createAvroFile(0, TOTAL_RECORDS, null);
+    createTableWithInsert();
+    try {
+      runExport(getArgv(true, 10, 10, newStrArray(argv, "-m", "" + 1)));
+    } catch (Exception e) {
+      // expected
+      assertTrue(true);
+    }
+  }
+
+  // Test Case for Issue [SQOOP-2846]
+  public void testAvroWithUpdateKey() throws IOException, SQLException {
+    String[] argv = { "--update-key", "ID" };
+    final int TOTAL_RECORDS = 1;
+    // ColumnGenerator gen = colGenerator("100",
+    // Schema.create(Schema.Type.STRING), null, "VARCHAR(64)");
+    createAvroFile(0, TOTAL_RECORDS, null);
+    createTableWithInsert();
+    runExport(getArgv(true, 10, 10, newStrArray(argv, "-m", "" + 1)));
+    verifyExport(getMsgPrefix() + "0");
+  }
   public void testMissingAvroFields()  throws IOException, SQLException {
     String[] argv = {};
     final int TOTAL_RECORDS = 1;
@@ -402,6 +499,28 @@ public class TestAvroExport extends ExportJobTestCase {
       // expected
       assertTrue(true);
     }
+  }
+
+  public void testSpecifiedColumnsAsAvroFields()  throws IOException, SQLException {
+    final int TOTAL_RECORDS = 10;
+    ColumnGenerator[] gens = new ColumnGenerator[] {
+      colGenerator(000, Schema.create(Schema.Type.INT), 100, "INTEGER"), //col0
+      colGenerator(111, Schema.create(Schema.Type.INT), 100, "INTEGER"), //col1
+      colGenerator(222, Schema.create(Schema.Type.INT), 100, "INTEGER"), //col2
+      colGenerator(333, Schema.create(Schema.Type.INT), 100, "INTEGER")  //col3
+    };
+    createAvroFile(0, TOTAL_RECORDS, gens);
+    createTable(gens);
+    runExport(getArgv(true, 10, 10, newStrArray(null, "-m", "" + 1, "--columns", "id,msg,col1,col2")));
+    verifyExport(TOTAL_RECORDS);
+    assertColValForRowId(0, "col0", null);
+    assertColValForRowId(0, "col1", 111);
+    assertColValForRowId(0, "col2", 222);
+    assertColValForRowId(0, "col3", null);
+    assertColValForRowId(9, "col0", null);
+    assertColValForRowId(9, "col1", 111);
+    assertColValForRowId(9, "col2", 222);
+    assertColValForRowId(9, "col3", null);
   }
 
 }

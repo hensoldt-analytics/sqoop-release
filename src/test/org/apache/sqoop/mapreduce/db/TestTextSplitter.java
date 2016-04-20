@@ -24,6 +24,7 @@ import java.util.List;
 import com.cloudera.sqoop.mapreduce.db.TextSplitter;
 
 import junit.framework.TestCase;
+import junit.framework.Test;
 import org.apache.sqoop.validation.ValidationException;
 
 /**

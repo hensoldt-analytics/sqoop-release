@@ -81,6 +81,31 @@ public class TestParquetImport extends ImportJobTestCase {
     return args.toArray(new String[args.size()]);
   }
 
+  protected String[] getOutputQueryArgv(boolean includeHadoopFlags, String[] extraArgs) {
+    ArrayList<String> args = new ArrayList<String>();
+
+    if (includeHadoopFlags) {
+      CommonArgs.addHadoopFlags(args);
+    }
+
+    args.add("--query");
+    args.add("SELECT * FROM " + getTableName() + " WHERE $CONDITIONS");
+    args.add("--connect");
+    args.add(HsqldbTestServer.getUrl());
+    args.add("--target-dir");
+    args.add(getWarehouseDir() + "/" + getTableName());
+    args.add("--m");
+    args.add("1");
+    args.add("--split-by");
+    args.add("INTFIELD1");
+    args.add("--as-parquetfile");
+    if (extraArgs != null) {
+      args.addAll(Arrays.asList(extraArgs));
+    }
+
+    return args.toArray(new String[args.size()]);
+  }
+
   public void testSnappyCompression() throws IOException {
     runParquetImportTest("snappy");
   }
@@ -115,7 +140,7 @@ public class TestParquetImport extends ImportJobTestCase {
     DatasetReader<GenericRecord> reader = getReader();
     try {
       GenericRecord record1 = reader.next();
-      //assertNull(record1);
+      assertNotNull(record1);
       assertEquals("DATA_COL0", true, record1.get("DATA_COL0"));
       assertEquals("DATA_COL1", 100, record1.get("DATA_COL1"));
       assertEquals("DATA_COL2", 200L, record1.get("DATA_COL2"));
@@ -127,6 +152,7 @@ public class TestParquetImport extends ImportJobTestCase {
       ByteBuffer b = ((ByteBuffer) object);
       assertEquals((byte) 1, b.get(0));
       assertEquals((byte) 2, b.get(1));
+      assertFalse(reader.hasNext());
     } finally {
       reader.close();
     }
@@ -148,8 +174,10 @@ public class TestParquetImport extends ImportJobTestCase {
 
     DatasetReader<GenericRecord> reader = getReader();
     try {
+      assertTrue(reader.hasNext());
       GenericRecord record1 = reader.next();
       assertEquals("DATA_COL0", "10", record1.get("DATA_COL0"));
+      assertFalse(reader.hasNext());
     } finally {
       reader.close();
     }
@@ -171,8 +199,35 @@ public class TestParquetImport extends ImportJobTestCase {
 
     DatasetReader<GenericRecord> reader = getReader();
     try {
+      assertTrue(reader.hasNext());
       GenericRecord record1 = reader.next();
       assertEquals("__NAME", 1987, record1.get("__NAME"));
+      assertFalse(reader.hasNext());
+    } finally {
+      reader.close();
+    }
+  }
+
+  public void testNonIdentCharactersInColumnName() throws IOException {
+    String [] names = { "test_p-a+r/quet" };
+    String [] types = { "INT" };
+    String [] vals = { "2015" };
+    createTableWithColTypesAndNames(names, types, vals);
+
+    runImport(getOutputArgv(true, null));
+
+    Schema schema = getSchema();
+    assertEquals(Type.RECORD, schema.getType());
+    List<Field> fields = schema.getFields();
+    assertEquals(types.length, fields.size());
+    checkField(fields.get(0), "TEST_P_A_R_QUET", Type.INT);
+
+    DatasetReader<GenericRecord> reader = getReader();
+    try {
+      assertTrue(reader.hasNext());
+      GenericRecord record1 = reader.next();
+      assertEquals("TEST_P_A_R_QUET", 2015, record1.get("TEST_P_A_R_QUET"));
+      assertFalse(reader.hasNext());
     } finally {
       reader.close();
     }
@@ -212,10 +267,65 @@ public class TestParquetImport extends ImportJobTestCase {
 
     DatasetReader<GenericRecord> reader = getReader();
     try {
+      assertTrue(reader.hasNext());
       GenericRecord record1 = reader.next();
       assertNull(record1.get("DATA_COL0"));
+      assertFalse(reader.hasNext());
     } finally {
       reader.close();
+    }
+  }
+
+  public void testQueryImport() throws IOException, SQLException {
+    String [] types = { "INT" };
+    String [] vals = { "1" };
+    createTableWithColTypes(types, vals);
+
+    runImport(getOutputQueryArgv(true, null));
+
+    DatasetReader<GenericRecord> reader = getReader();
+    try {
+      assertTrue(reader.hasNext());
+      GenericRecord record1 = reader.next();
+      assertEquals(1, record1.get("DATA_COL0"));
+      assertFalse(reader.hasNext());
+    } finally {
+      reader.close();
+    }
+  }
+
+  public void testIncrementalParquetImport() throws IOException, SQLException {
+    String [] types = { "INT" };
+    String [] vals = { "1" };
+    createTableWithColTypes(types, vals);
+
+    runImport(getOutputArgv(true, null));
+    runImport(getOutputArgv(true, new String[]{"--append"}));
+
+    DatasetReader<GenericRecord> reader = getReader();
+    try {
+      assertTrue(reader.hasNext());
+      GenericRecord record1 = reader.next();
+      assertEquals(1, record1.get("DATA_COL0"));
+      record1 = reader.next();
+      assertEquals(1, record1.get("DATA_COL0"));
+      assertFalse(reader.hasNext());
+    } finally {
+      reader.close();
+    }
+  }
+
+  public void testOverwriteParquetDatasetFail() throws IOException, SQLException {
+    String [] types = { "INT" };
+    String [] vals = {};
+    createTableWithColTypes(types, vals);
+
+    runImport(getOutputArgv(true, null));
+    try {
+      runImport(getOutputArgv(true, null));
+      fail("");
+    } catch (IOException ex) {
+      // ok
     }
   }
 
@@ -234,6 +344,15 @@ public class TestParquetImport extends ImportJobTestCase {
   private Dataset<GenericRecord> getDataset() {
     String uri = "dataset:file:" + getTablePath();
     return Datasets.load(uri, GenericRecord.class);
+  }
+
+  @Override
+  public void tearDown() {
+    super.tearDown();
+    String uri = "dataset:file:" + getTablePath();
+    if (Datasets.exists(uri)) {
+      Datasets.delete(uri);
+    }
   }
 
   private void checkField(Field field, String name, Type type) {

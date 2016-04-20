@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -47,6 +48,7 @@ import com.cloudera.sqoop.mapreduce.ImportJobBase;
 import com.cloudera.sqoop.mapreduce.db.DBConfiguration;
 import com.cloudera.sqoop.mapreduce.db.DataDrivenDBInputFormat;
 import com.cloudera.sqoop.orm.AvroSchemaGenerator;
+import org.kitesdk.data.Datasets;
 import org.kitesdk.data.mapreduce.DatasetKeyOutputFormat;
 
 /**
@@ -97,7 +99,7 @@ public class DataDrivenImportJob extends ImportJobBase {
       AvroJob.setMapOutputSchema(job.getConfiguration(), schema);
     } else if (options.getFileLayout()
         == SqoopOptions.FileLayout.ParquetFile) {
-      Configuration conf = job.getConfiguration();
+      JobConf conf = (JobConf)job.getConfiguration();
       // Kite SDK requires an Avro schema to represent the data structure of
       // target dataset. If the schema name equals to generated java class name,
       // the import will fail. So we use table name as schema name and add a
@@ -105,8 +107,27 @@ public class DataDrivenImportJob extends ImportJobBase {
       final String schemaNameOverride = tableName;
       Schema schema = generateAvroSchema(tableName, schemaNameOverride);
       String uri = getKiteUri(conf, tableName);
-      ParquetJob.configureImportJob(conf, schema, uri, options.isAppendMode(),
-          options.doHiveImport() && options.doOverwriteHiveTable());
+      ParquetJob.WriteMode writeMode;
+
+      if (options.doHiveImport()) {
+        if (options.doOverwriteHiveTable()) {
+          writeMode = ParquetJob.WriteMode.OVERWRITE;
+        } else {
+          writeMode = ParquetJob.WriteMode.APPEND;
+          if (Datasets.exists(uri)) {
+            LOG.warn("Target Hive table '" + tableName + "' exists! Sqoop will " +
+                "append data into the existing Hive table. Consider using " +
+                "--hive-overwrite, if you do NOT intend to do appending.");
+          }
+        }
+      } else {
+        // Note that there is no such an import argument for overwriting HDFS
+        // dataset, so overwrite mode is not supported yet.
+        // Sqoop's append mode means to merge two independent datasets. We
+        // choose DEFAULT as write mode.
+        writeMode = ParquetJob.WriteMode.DEFAULT;
+      }
+      ParquetJob.configureImportJob(conf, schema, uri, writeMode);
     }
 
     job.setMapperClass(getMapperClass());
@@ -299,6 +320,11 @@ public class DataDrivenImportJob extends ImportJobBase {
 
       job.getConfiguration().setLong(LargeObjectLoader.MAX_INLINE_LOB_LEN_KEY,
           options.getInlineLobLimit());
+
+      if (options.getSplitLimit() != null) {
+        org.apache.sqoop.config.ConfigurationHelper.setSplitLimit(
+          job.getConfiguration(), options.getSplitLimit());
+      }
 
       LOG.debug("Using InputFormat: " + inputFormatClass);
       job.setInputFormatClass(inputFormatClass);

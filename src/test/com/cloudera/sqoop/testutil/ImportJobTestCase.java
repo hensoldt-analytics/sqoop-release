@@ -35,6 +35,7 @@ import com.cloudera.sqoop.orm.CompilationManager;
 import com.cloudera.sqoop.tool.SqoopTool;
 import com.cloudera.sqoop.tool.ImportTool;
 import com.cloudera.sqoop.util.ClassLoaderStack;
+import org.junit.Before;
 
 /**
  * Class that implements common methods required for tests which import data
@@ -44,6 +45,12 @@ public abstract class ImportJobTestCase extends BaseSqoopTestCase {
 
   public static final Log LOG = LogFactory.getLog(
       ImportJobTestCase.class.getName());
+
+  @Before
+  public void setUp() {
+    super.setUp();
+    removeTableDir();
+  }
 
   protected String getTablePrefix() {
     return "IMPORT_TABLE_";
@@ -206,8 +213,6 @@ public abstract class ImportJobTestCase extends BaseSqoopTestCase {
    * execution).
    */
   protected void runImport(SqoopTool tool, String [] argv) throws IOException {
-    removeTableDir();
-
     // run the tool through the normal entry-point.
     int ret;
     try {

@@ -40,6 +40,7 @@ import org.apache.sqoop.util.password.CredentialProviderHelper;
 import com.cloudera.sqoop.ConnFactory;
 import com.cloudera.sqoop.Sqoop;
 import com.cloudera.sqoop.SqoopOptions;
+import com.cloudera.sqoop.SqoopOptions.IncrementalMode;
 import com.cloudera.sqoop.SqoopOptions.InvalidOptionsException;
 import com.cloudera.sqoop.cli.RelatedOptions;
 import com.cloudera.sqoop.cli.ToolOptions;
@@ -82,6 +83,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String CLEAR_STAGING_TABLE_ARG = "clear-staging-table";
   public static final String COLUMNS_ARG = "columns";
   public static final String SPLIT_BY_ARG = "split-by";
+  public static final String SPLIT_LIMIT_ARG = "split-limit";
   public static final String WHERE_ARG = "where";
   public static final String HADOOP_HOME_ARG = "hadoop-home";
   public static final String HADOOP_MAPRED_HOME_ARG = "hadoop-mapred-home";
@@ -121,6 +123,8 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String HCATALOG_DATABASE_ARG = "hcatalog-database";
   public static final String CREATE_HCATALOG_TABLE_ARG =
     "create-hcatalog-table";
+  public static final String DROP_AND_CREATE_HCATALOG_TABLE =
+    "drop-and-create-hcatalog-table";
   public static final String HCATALOG_STORAGE_STANZA_ARG =
     "hcatalog-storage-stanza";
   public static final String HCATALOG_HOME_ARG = "hcatalog-home";
@@ -159,6 +163,7 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
   public static final String SQL_QUERY_SHORT_ARG = "e";
   public static final String VERBOSE_ARG = "verbose";
   public static final String HELP_ARG = "help";
+  public static final String TEMP_ROOTDIR_ARG = "temporary-rootdir";
   public static final String UPDATE_KEY_ARG = "update-key";
   public static final String UPDATE_MODE_ARG = "update-mode";
   public static final String CALL_ARG = "call";
@@ -252,6 +257,8 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
    */
   protected boolean init(SqoopOptions sqoopOpts) {
     // Get the connection to the database.
+      // Set the tool name in sqoop options
+      sqoopOpts.setToolName(getToolName());
     try {
       JobData data = new JobData(sqoopOpts, this);
       this.manager = new ConnFactory(sqoopOpts.getConf()).getManager(data);
@@ -462,6 +469,12 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
         .withDescription("Print usage instructions")
         .withLongOpt(HELP_ARG)
         .create());
+    commonOpts.addOption(OptionBuilder
+        .withDescription("Defines the temporary root directory for the import")
+        .withLongOpt(TEMP_ROOTDIR_ARG)
+        .hasArg()
+        .withArgName("rootdir")
+        .create());
     // relax isolation requirements
     commonOpts.addOption(OptionBuilder
         .withDescription("Use read-uncommitted isolation for imports")
@@ -605,6 +618,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     hCatOptions.addOption(OptionBuilder
       .withDescription("Create HCatalog before import")
       .withLongOpt(CREATE_HCATALOG_TABLE_ARG)
+      .create());
+    hCatOptions.addOption(OptionBuilder
+      .withDescription("Drop and Create HCatalog before import")
+      .withLongOpt(DROP_AND_CREATE_HCATALOG_TABLE)
       .create());
     hCatOptions.addOption(OptionBuilder
       .hasArg()
@@ -934,6 +951,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
       throw new InvalidOptionsException("");
     }
 
+    if (in.hasOption(TEMP_ROOTDIR_ARG)) {
+      out.setTempRootDir(in.getOptionValue(TEMP_ROOTDIR_ARG));
+    }
+
     if (in.hasOption(CONNECT_STRING_ARG)) {
       out.setConnectString(in.getOptionValue(CONNECT_STRING_ARG));
     }
@@ -1143,6 +1164,10 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
 
     if (in.hasOption(CREATE_HCATALOG_TABLE_ARG)) {
       out.setCreateHCatalogTable(true);
+    }
+
+    if (in.hasOption(DROP_AND_CREATE_HCATALOG_TABLE)) {
+      out.setDropAndCreateHCatalogTable(true);
     }
 
     if (in.hasOption(HCATALOG_HOME_ARG)) {
@@ -1406,7 +1431,8 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
     }
 
     if (options.doHiveImport()
-        && options.isAppendMode()) {
+        && options.isAppendMode()
+        && !options.getIncrementalMode().equals(IncrementalMode.AppendRows)) {
       throw new InvalidOptionsException("Append mode for hive imports is not "
           + " yet supported. Please remove the parameter --append-mode");
     }
@@ -1624,6 +1650,12 @@ public abstract class BaseSqoopTool extends com.cloudera.sqoop.tool.SqoopTool {
             + " --hive-partition-value options should be provided or both of "
             + "these options should be omitted");
       }
+    }
+    if (options.doCreateHCatalogTable() &&
+            options.doDropAndCreateHCatalogTable()) {
+      throw new InvalidOptionsException("Options --create-hcatalog-table" +
+              " and --drop-and-create-hcatalog-table are mutually exclusive." +
+              " Use any one of them");
     }
   }
 

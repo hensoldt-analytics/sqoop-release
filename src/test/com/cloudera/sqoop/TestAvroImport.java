@@ -85,20 +85,24 @@ public class TestAvroImport extends ImportJobTestCase {
   }
 
   public void testAvroImport() throws IOException {
+    this.setCurTableName("Avro_Import_Test");
     avroImportTestHelper(null, null);
   }
 
   public void testDeflateCompressedAvroImport() throws IOException {
+    this.setCurTableName("Deflate_Compressed_Avro_Import_Test_1");
     avroImportTestHelper(new String[] {"--compression-codec",
       "org.apache.hadoop.io.compress.DefaultCodec", }, "deflate");
   }
 
   public void testDefaultCompressedAvroImport() throws IOException {
+    this.setCurTableName("Deflate_Compressed_Avro_Import_Test_2");
     avroImportTestHelper(new String[] {"--compress", }, "deflate");
   }
 
   public void testUnsupportedCodec() throws IOException {
     try {
+      this.setCurTableName("Deflate_Compressed_Avro_Import_Test_3");
       avroImportTestHelper(new String[] {"--compression-codec", "foobar", },
         null);
       fail("Expected IOException");
@@ -118,12 +122,12 @@ public class TestAvroImport extends ImportJobTestCase {
    *                  to those that {@link #getOutputArgv(boolean, String[])}
    *                  returns
    */
-  private void avroImportTestHelper(String[] extraArgs, String codec)
-    throws IOException {
+  protected void avroImportTestHelper(String[] extraArgs, String codec)
+      throws IOException {
     String[] types =
       {"BIT", "INTEGER", "BIGINT", "REAL", "DOUBLE", "VARCHAR(6)",
-        "VARBINARY(2)", };
-    String[] vals = {"true", "100", "200", "1.0", "2.0", "'s'", "'0102'", };
+        "VARBINARY(2)", "DECIMAL(3,2)"};
+    String[] vals = {"true", "100", "200", "1.0", "2.0", "'s'", "'0102'", "'1.00'"};
     createTableWithColTypes(types, vals);
 
     runImport(getOutputArgv(true, extraArgs));
@@ -142,6 +146,7 @@ public class TestAvroImport extends ImportJobTestCase {
     checkField(fields.get(4), "DATA_COL4", Schema.Type.DOUBLE);
     checkField(fields.get(5), "DATA_COL5", Schema.Type.STRING);
     checkField(fields.get(6), "DATA_COL6", Schema.Type.BYTES);
+    checkField(fields.get(7), "DATA_COL7", Schema.Type.STRING);
 
     GenericRecord record1 = reader.next();
     assertEquals("DATA_COL0", true, record1.get("DATA_COL0"));
@@ -155,6 +160,7 @@ public class TestAvroImport extends ImportJobTestCase {
     ByteBuffer b = ((ByteBuffer) object);
     assertEquals((byte) 1, b.get(0));
     assertEquals((byte) 2, b.get(1));
+    assertEquals("DATA_COL7", "1.00", record1.get("DATA_COL7").toString());
 
     if (codec != null) {
       assertEquals(codec, reader.getMetaString(DataFileConstants.CODEC));
@@ -207,9 +213,10 @@ public class TestAvroImport extends ImportJobTestCase {
   }
 
   public void testNonstandardCharactersInColumnName() throws IOException {
-    String [] names = { "avroå1" };
+    String [] names = { "avro\uC3A11" };
     String [] types = { "INT" };
     String [] vals = { "1987" };
+    this.setCurTableName("Non_Std_Character_Test");
     createTableWithColTypesAndNames(names, types, vals);
 
     runImport(getOutputArgv(true, null));
@@ -221,10 +228,10 @@ public class TestAvroImport extends ImportJobTestCase {
     List<Field> fields = schema.getFields();
     assertEquals(types.length, fields.size());
 
-    checkField(fields.get(0), "AVRO1", Type.INT);
+    checkField(fields.get(0), "AVRO_1", Type.INT);
 
     GenericRecord record1 = reader.next();
-    assertEquals("AVRO1", 1987, record1.get("AVRO1"));
+    assertEquals("AVRO_1", 1987, record1.get("AVRO_1"));
   }
 
   public void testNonIdentCharactersInColumnName() throws IOException {
@@ -248,7 +255,34 @@ public class TestAvroImport extends ImportJobTestCase {
     assertEquals("TEST_A_V_R_O", 2015, record1.get("TEST_A_V_R_O"));
   }
 
-  private void checkField(Field field, String name, Type type) {
+  /*
+   * Test Case For checking multiple columns having non standard characters in multiple columns
+   */
+  public void testNonstandardCharactersInMultipleColumns() throws IOException {
+    String[] names = { "id$1", "id1$" };
+    String[] types = { "INT", "INT" };
+    String[] vals = { "1987", "1988" };
+    this.setCurTableName("Non_Std_Character_Test_For_Multiple_Columns");
+    createTableWithColTypesAndNames(names, types, vals);
+
+    runImport(getOutputArgv(true, null));
+
+    Path outputFile = new Path(getTablePath(), "part-m-00000.avro");
+    DataFileReader<GenericRecord> reader = read(outputFile);
+    Schema schema = reader.getSchema();
+    assertEquals(Schema.Type.RECORD, schema.getType());
+    List<Field> fields = schema.getFields();
+    assertEquals(types.length, fields.size());
+
+    checkField(fields.get(0), "ID_1", Type.INT);
+
+    GenericRecord record1 = reader.next();
+    assertEquals("ID_1", 1987, record1.get("ID_1"));
+    checkField(fields.get(1), "ID1_", Type.INT);
+    assertEquals("ID1_", 1988, record1.get("ID1_"));
+  }
+
+  protected void checkField(Field field, String name, Type type) {
     assertEquals(name, field.name());
     assertEquals(Schema.Type.UNION, field.schema().getType());
     assertEquals(Schema.Type.NULL, field.schema().getTypes().get(0).getType());
@@ -270,7 +304,7 @@ public class TestAvroImport extends ImportJobTestCase {
 
   }
 
-  private DataFileReader<GenericRecord> read(Path filename) throws IOException {
+  protected DataFileReader<GenericRecord> read(Path filename) throws IOException {
     Configuration conf = new Configuration();
     if (!BaseSqoopTestCase.isOnPhysicalCluster()) {
       conf.set(CommonArgs.FS_DEFAULT_NAME, CommonArgs.LOCAL_FS);
@@ -281,7 +315,7 @@ public class TestAvroImport extends ImportJobTestCase {
     return new DataFileReader<GenericRecord>(fsInput, datumReader);
   }
 
-  private void checkSchemaFile(final Schema schema) throws IOException {
+  protected void checkSchemaFile(final Schema schema) throws IOException {
     final File schemaFile = new File(schema.getName() + ".avsc");
     assertTrue(schemaFile.exists());
     assertEquals(schema, new Schema.Parser().parse(schemaFile));

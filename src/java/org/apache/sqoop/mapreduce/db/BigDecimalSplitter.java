@@ -40,7 +40,7 @@ public class BigDecimalSplitter implements DBSplitter  {
     private static final Log LOG = LogFactory.getLog(BigDecimalSplitter.class);
 
     public List<InputSplit> split(Configuration conf, ResultSet results,
-                                  String colName) throws SQLException, ValidationException {
+      String colName) throws SQLException, ValidationException {
 
         BigDecimal minVal = results.getBigDecimal(1);
         BigDecimal maxVal = results.getBigDecimal(2);
@@ -141,11 +141,12 @@ public class BigDecimalSplitter implements DBSplitter  {
             curVal = curVal.add(splitSize);
         }
 
-        /*
-        * If the sort order and collation of the char columns differ we can have
-        * a situation where minVal > maxVal and splits can be empty list.
-        */
-        if ((splits.size() > 1 && splits.get(splits.size() - 1).compareTo(maxVal) != 0)
+    /*
+     * If the sort order and collation of the char columns differ we can have
+     * a situation where minVal > maxVal and splits can be empty list.
+     */
+
+    if ((splits.size() > 1 && splits.get(splits.size() - 1).compareTo(maxVal) != 0)
                 || splits.size() == 1) {
             // We didn't end on the maxVal. Add that to the end of the list.
             splits.add(maxVal);

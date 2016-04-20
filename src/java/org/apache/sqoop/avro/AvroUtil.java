@@ -17,15 +17,28 @@
  */
 package org.apache.sqoop.avro;
 
+import org.apache.avro.LogicalType;
 import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileReader;
+import org.apache.avro.file.FileReader;
+import org.apache.avro.file.SeekableInput;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.mapred.FsInput;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.sqoop.lib.BlobRef;
 import org.apache.sqoop.lib.ClobRef;
 import org.apache.sqoop.orm.ClassWriter;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Date;
@@ -38,12 +51,29 @@ import java.util.Map;
  * The service class provides methods for creating and converting Avro objects.
  */
 public final class AvroUtil {
+  public static boolean isDecimal(Schema.Field field) {
+    return isDecimal(field.schema());
+  }
+
+  public static boolean isDecimal(Schema schema) {
+    if (schema.getType().equals(Schema.Type.UNION)) {
+      for (Schema type : schema.getTypes()) {
+        if (isDecimal(type)) {
+          return true;
+        }
+      }
+
+      return false;
+    } else {
+      return "decimal".equals(schema.getProp(LogicalType.LOGICAL_TYPE_PROP));
+    }
+  }
 
   /**
    * Convert a Sqoop's Java representation to Avro representation.
    */
-  public static Object toAvro(Object o, boolean bigDecimalFormatString) {
-    if (o instanceof BigDecimal) {
+  public static Object toAvro(Object o, Schema.Field field, boolean bigDecimalFormatString) {
+    if (o instanceof BigDecimal && !isDecimal(field)) {
       if (bigDecimalFormatString) {
         // Returns a string representation of this without an exponent field.
         return ((BigDecimal) o).toPlainString();
@@ -84,7 +114,7 @@ public final class AvroUtil {
    * Format candidate to avro specifics
    */
   public static String toAvroIdentifier(String candidate) {
-    String formattedCandidate = candidate.replaceAll("\\W+", "");
+    String formattedCandidate = candidate.replaceAll("\\W+", "_");
     if (formattedCandidate.substring(0,1).matches("[a-zA-Z_]")) {
       return formattedCandidate;
     } else {
@@ -99,8 +129,9 @@ public final class AvroUtil {
       Schema schema, boolean bigDecimalFormatString) {
     GenericRecord record = new GenericData.Record(schema);
     for (Map.Entry<String, Object> entry : fieldMap.entrySet()) {
-      Object avroObject = toAvro(entry.getValue(), bigDecimalFormatString);
       String avroColumn = toAvroColumn(entry.getKey());
+      Schema.Field field = schema.getField(avroColumn);
+      Object avroObject = toAvro(entry.getValue(), field, bigDecimalFormatString);
       record.put(avroColumn, avroObject);
     }
     return record;
@@ -175,7 +206,12 @@ public final class AvroUtil {
           throw new IllegalArgumentException("Only support union with null");
         }
       case FIXED:
-        return new BytesWritable(((GenericFixed) avroObject).bytes());
+        if (isDecimal(schema)) {
+          // Should automatically be a BigDecimal object.
+          return avroObject;
+        } else {
+          return new BytesWritable(((GenericFixed) avroObject).bytes());
+        }
       case RECORD:
       case ARRAY:
       case MAP:
@@ -185,4 +221,35 @@ public final class AvroUtil {
     }
   }
 
+  /**
+   * Get the schema of AVRO files stored in a directory
+   */
+  public static Schema getAvroSchema(Path path, Configuration conf)
+      throws IOException {
+    FileSystem fs = path.getFileSystem(conf);
+    Path fileToTest;
+    if (fs.isDirectory(path)) {
+      FileStatus[] fileStatuses = fs.listStatus(path, new PathFilter() {
+        @Override
+        public boolean accept(Path p) {
+          String name = p.getName();
+          return !name.startsWith("_") && !name.startsWith(".");
+        }
+      });
+      if (fileStatuses.length == 0) {
+        return null;
+      }
+      fileToTest = fileStatuses[0].getPath();
+    } else {
+      fileToTest = path;
+    }
+
+    SeekableInput input = new FsInput(fileToTest, conf);
+    DatumReader<GenericRecord> reader = new GenericDatumReader<GenericRecord>();
+    FileReader<GenericRecord> fileReader = DataFileReader.openReader(input, reader);
+
+    Schema result = fileReader.getSchema();
+    fileReader.close();
+    return result;
+  }
 }

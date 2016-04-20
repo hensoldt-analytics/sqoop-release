@@ -26,6 +26,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -120,6 +121,8 @@ public class ClassWriter {
     // not strictly reserved words, but collides with
     // our imports
     JAVA_RESERVED_WORDS.add("Text");
+    //Fix For Issue SQOOP-2839
+    JAVA_RESERVED_WORDS.add("PROTOCOL_VERSION");
   }
 
   public static final String PROPERTY_CODEGEN_METHODS_MAXCOLS =
@@ -1093,7 +1096,7 @@ public class ClassWriter {
             sb.append("    else");
           }
 
-          sb.append("    if (\"" + rawColNames[i] + "\".equals(__fieldName)) {\n");
+          sb.append("    if (\"" + serializeRawColName(rawColNames[i]) + "\".equals(__fieldName)) {\n");
           sb.append("      this." + colNames[i] + " = (" + javaType
               + ") __fieldVal;\n");
           sb.append("    }\n");
@@ -1110,6 +1113,20 @@ public class ClassWriter {
     for (int i = 0; i < numberOfMethods; ++i) {
       myGenerateSetField(columnTypes, colNames, rawColNames, sb, i, maxColumnsPerMethod);
     }
+  }
+
+  /**
+   * Raw column name is a column name as it was created on database and we need to serialize it between
+   * double quotes into java class that will be further complied with javac. Various databases supports
+   * various edge conditions for column names, so we can't assume that raw column name can be just passed
+   * between double quotes and everything will work correctly. That will break for databases that supports
+   * double quotes in column name as that will result in "column with "" which is invalid.
+   *
+   * @param name Raw column name to escape
+   * @return
+   */
+  private String serializeRawColName(String name) {
+    return name.replace("\"", "\\\"");
   }
 
   /**
@@ -1140,7 +1157,7 @@ public class ClassWriter {
           sb.append("    else");
         }
 
-        sb.append("    if (\"" + rawColName + "\".equals(__fieldName)) {\n");
+        sb.append("    if (\"" + serializeRawColName(rawColName) + "\".equals(__fieldName)) {\n");
         sb.append("      this." + colName + " = (" + javaType
             + ") __fieldVal;\n");
         sb.append("      return true;\n");
@@ -1205,8 +1222,7 @@ public class ClassWriter {
 
     for (int i = methodNumber * size;
          i < topBoundary(colNames, methodNumber, size); ++i) {
-      sb.append("    __sqoop$field_map.put(\"" + rawColNames[i] + "\", this."
-          + colNames[i] + ");\n");
+      sb.append("    __sqoop$field_map.put(\"" + serializeRawColName(rawColNames[i]) + "\", this." + colNames[i] + ");\n");
     }
 
     if (wrapInMethod) {
@@ -1845,6 +1861,14 @@ public class ClassWriter {
       return connManager.getColumnTypes(tableName, options.getSqlQuery());
     } else {
       return connManager.getColumnTypesForProcedure(options.getCall());
+    }
+  }
+
+  protected Map<String, List<Integer>> getColumnInfo() throws IOException {
+    if (options.getCall() == null) {
+      return connManager.getColumnInfo(tableName, options.getSqlQuery());
+    } else {
+      return connManager.getColumnInfoForProcedure(options.getCall());
     }
   }
 

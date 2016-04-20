@@ -430,6 +430,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
   protected void lastModifiedMerge(SqoopOptions options, ImportJobContext context) throws IOException {
     FileSystem fs = FileSystem.get(options.getConf());
     if (context.getDestination() != null && fs.exists(context.getDestination())) {
+      LOG.info("Final destination exists, will run merge job.");
       Path userDestDir = getOutputPath(options, context.getTableName(), false);
       if (fs.exists(userDestDir)) {
         String tableClassName = null;
@@ -461,7 +462,16 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
 
         unloadJars();
       } else {
-        fs.rename(context.getDestination(), userDestDir);
+        // Create parent directory(ies), otherwise fs.rename would fail
+        if(!fs.exists(userDestDir.getParent())) {
+          fs.mkdirs(userDestDir.getParent());
+        }
+
+        // And finally move the data
+        LOG.info("Moving data from temporary directory " + context.getDestination() + " to final destination " + userDestDir);
+        if(!fs.rename(context.getDestination(), userDestDir)) {
+          throw new RuntimeException("Couldn't move data from temporary directory " + context.getDestination() + " to final destination " + userDestDir);
+        }
       }
     }
   }
@@ -561,7 +571,7 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
       if(salt == null && options.getSqlQuery() != null) {
         salt = Integer.toHexString(options.getSqlQuery().hashCode());
       }
-      outputPath = AppendUtils.getTempAppendDir(salt);
+      outputPath = AppendUtils.getTempAppendDir(salt, options);
       LOG.debug("Using temporary folder: " + outputPath.getName());
     } else {
       // Try in this order: target-dir or warehouse-dir
@@ -660,6 +670,14 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
           .hasArg()
           .withDescription("Column of the table used to split work units")
           .withLongOpt(SPLIT_BY_ARG)
+          .create());
+      importOpts
+        .addOption(OptionBuilder
+          .withArgName("size")
+          .hasArg()
+          .withDescription(
+            "Upper Limit of rows per split for split columns of Date/Time/Timestamp and integer types. For date or timestamp fields it is calculated in seconds. split-limit should be greater than 0")
+          .withLongOpt(SPLIT_LIMIT_ARG)
           .create());
       importOpts.addOption(OptionBuilder.withArgName("where clause")
           .hasArg().withDescription("WHERE clause to use during import")
@@ -885,6 +903,10 @@ public class ImportTool extends com.cloudera.sqoop.tool.BaseSqoopTool {
 
         if (in.hasOption(SPLIT_BY_ARG)) {
           out.setSplitByCol(in.getOptionValue(SPLIT_BY_ARG));
+        }
+
+        if (in.hasOption(SPLIT_LIMIT_ARG)) {
+            out.setSplitLimit(Integer.parseInt(in.getOptionValue(SPLIT_LIMIT_ARG)));
         }
 
         if (in.hasOption(WHERE_ARG)) {

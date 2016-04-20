@@ -29,28 +29,12 @@ import com.cloudera.sqoop.lib.SqoopRecord;
  * a new one if possible; otherwise, an old one.
  */
 public class MergeReducer
-    extends Reducer<Text, MergeRecord, SqoopRecord, NullWritable> {
+ extends MergeReducerBase<SqoopRecord, NullWritable> {
 
   @Override
-  public void reduce(Text key, Iterable<MergeRecord> vals, Context c)
+  protected void writeRecord(SqoopRecord record, Context c)
       throws IOException, InterruptedException {
-    SqoopRecord bestRecord = null;
-    try {
-      for (MergeRecord val : vals) {
-        if (null == bestRecord && !val.isNewRecord()) {
-          // Use an old record if we don't have a new record.
-          bestRecord = (SqoopRecord) val.getSqoopRecord().clone();
-        } else if (val.isNewRecord()) {
-          bestRecord = (SqoopRecord) val.getSqoopRecord().clone();
-        }
-      }
-    } catch (CloneNotSupportedException cnse) {
-      throw new IOException(cnse);
-    }
-
-    if (null != bestRecord) {
-      c.write(bestRecord, NullWritable.get());
-    }
+    c.write(record, NullWritable.get());
   }
 }
 

@@ -96,10 +96,19 @@ public final class ConfigurationConstants {
   public static final String MAPRED_DISTCACHE_CONF_PARAM = "tmpjars";
 
   /**
+   * The Configuration property identifying the split size.
+   */
+  public static final String PROP_SPLIT_LIMIT = "split.limit";
+
+  /**
+   * Enable avro logical types (decimal support only).
+   */
+  public static final String PROP_ENABLE_AVRO_LOGICAL_TYPE_DECIMAL = "sqoop.avro.logical_types.decimal.enable";
+
+  /**
    * The Configuration property identifying data publisher class.
    */
   public static final String DATA_PUBLISH_CLASS = "sqoop.job.data.publish.class";
-
 
   private ConfigurationConstants() {
     // Disable Explicit Object Creation

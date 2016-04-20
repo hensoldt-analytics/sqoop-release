@@ -410,17 +410,17 @@ Argument                              Description
                                       columns.  Default is false.
 +--crin-string+                       Applicable only for direct mode export.\
                                       Specifies whether carriage return \
-                                      (ASCII chars 13) can be allowed \
+                                      (ASCII char 13) can be allowed \
                                       to be part of char/nchar/varchar/nvarchar\
-                                      columns.  Note that CR can no longer\
+                                      columns.  Note that CR can no longer \
                                       be a record delimiter with this option.\
                                       Default is false.
 +--ignore-zero+                       Applicable only for direct mode export.\
-                                      Specifies whether carriage return \
-                                      (ASCII chars 13) can be allowed \
-                                      to be part of char/nchar/varchar/nvarchar\
-                                      columns.  Note that CR can no longer\
-                                      be a record delimiter with this option.\
+                                      Specifies whether NUL character \
+                                      (ASCII char 0) should be scanned \
+                                      and ignored as part of the data loaded\
+                                      into char/nchar/varchar/nvarchar \
+                                      columns.\
                                       Default is false.
 --------------------------------------------------------------------------------
 
@@ -1742,6 +1742,13 @@ If a column name of an Oracle table needs to be quoted, use::
 $ +sqoop import ... --table customers --columns "\"\"first name\"\""+
 +
 This is the equivalent of: `select "first name" from customers`
+
+If multiple columns need to be quoted, use::
+$ +sqoop import ... --table customers --columns "\"\"first name\",\"last
+name\",\"region name\"\""+
++
+This is the equivalent of: `select "first name", "last name", "region name"
+from customers`
 
 Confirm The Data Connector for Oracle and Hadoop Can Initialize The Oracle Session
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
