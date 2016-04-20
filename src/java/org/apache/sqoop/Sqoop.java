@@ -26,11 +26,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.sqoop.util.OptionsFileUtil;
 
 import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.cli.ToolOptions;
 import com.cloudera.sqoop.tool.SqoopTool;
+import com.cloudera.sqoop.util.OptionsFileUtil;
 
 /**
  * Main entry-point for Sqoop
@@ -53,11 +53,6 @@ public class Sqoop extends Configured implements Tool {
    * tool are read.
    */
   public static final String SQOOP_OPTIONS_FILE_SPECIFIER = "--options-file";
-
-  /**
-   * Allow an environment variable to provide default Sqoop options.
-   */
-  public static final String SQOOP_DEFAULT_OPTIONS_ENV_VAR = "SQOOP_CMD_OPTS";
 
   static {
     Configuration.addDefaultResource("sqoop-site.xml");
@@ -202,9 +197,6 @@ public class Sqoop extends Configured implements Tool {
     String[] expandedArgs = null;
     try {
       expandedArgs = OptionsFileUtil.expandArguments(args);
-      // Add Sqoop options environment variable contents to the command line
-      expandedArgs = OptionsFileUtil.expandSqoopDefaultCmdOpt(expandedArgs,
-        System.getenv(Sqoop.SQOOP_DEFAULT_OPTIONS_ENV_VAR));
     } catch (Exception ex) {
       LOG.error("Error while expanding arguments", ex);
       System.err.println(ex.getMessage());

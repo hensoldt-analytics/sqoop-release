@@ -18,6 +18,8 @@
 
 package com.cloudera.sqoop.util;
 
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @deprecated Moving to use org.apache.sqoop namespace.
@@ -27,9 +29,8 @@ public final class OptionsFileUtil {
   private OptionsFileUtil() { }
 
   public static String[] expandArguments(String[] args) throws Exception {
+    List<String> options = new ArrayList<String>();
     return org.apache.sqoop.util.OptionsFileUtil.expandArguments(args);
   }
-  public static String[] expandSqoopDefaultCmdOpt(String[] args, String cmdOpts) {
-    return org.apache.sqoop.util.OptionsFileUtil.expandSqoopDefaultCmdOpt(args, cmdOpts);
-  }
+
 }
