@@ -152,63 +152,6 @@ public class TestOptionsFileExpansion extends TestCase {
     checkInvalidOptionsFile(OPTIONS_FILE_TEXT5);
   }
 
-  public void testSqoopCmdOptionEnv() {
-    String envStr = "--a --b --c";
-    String[] expectedArgs = {
-      "--a",
-      "--b",
-      "--c",
-    };
-    String[] args = OptionsFileUtil.expandSqoopDefaultCmdOpt(null, envStr);
-    Assert.assertArrayEquals(args, expectedArgs);
-  }
-
-  public void testSqoopCmdOptionEnvWithArgs() {
-    String envStr = "--c --d --e";
-    String[] givenArgs = {
-      "--a",
-      "--b",
-    };
-    String[] expectedArgs = {
-      "--a",
-      "--b",
-      "--c",
-      "--d",
-      "--e",
-    };
-    String[] args = OptionsFileUtil.expandSqoopDefaultCmdOpt(givenArgs, envStr);
-    Assert.assertArrayEquals(args, expectedArgs);
-  }
-
-  public void testSqoopCmdOptionEmptyEnvWithArgs() {
-    String envStr = "";
-    String[] givenArgs = {
-      "--a",
-      "--b",
-    };
-    String[] expectedArgs = {
-      "--a",
-      "--b",
-    };
-    String[] args = OptionsFileUtil.expandSqoopDefaultCmdOpt(givenArgs, envStr);
-    Assert.assertArrayEquals(args, expectedArgs);
-  }
-
-  public void testSqoopCmdOptionNullEnvWithArgs() {
-    String envStr = null;
-    String[] givenArgs = {
-      "--a",
-      "--b",
-    };
-    String[] expectedArgs = {
-      "--a",
-      "--b",
-    };
-    String[] args = OptionsFileUtil.expandSqoopDefaultCmdOpt(givenArgs, envStr);
-    Assert.assertArrayEquals(args, expectedArgs);
-  }
-
-
   public void testMultilineQuotedText() {
     try {
       checkOptionsFile(OPTIONS_FILE_TEXT6, new String[] {});
