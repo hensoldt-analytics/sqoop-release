@@ -9,5 +9,7 @@
    SQOOP-2387: Sqoop should support importing from table with column names containing some special character
    SQOOP-2457: Add option to automatically compute statistics after loading date into a hive table
  BUG FIXES
+   SQOOP-2779: Sqoop metastore doesn't seem to recognize --schema option
+   SQOOP-2737: Cannot import table from Oracle with column with spaces in name 
    SQOOP-2364: Fix Netezza trunc-string option handling and unnecessary log directory during imports
    SQOOP-2399: Sqoop import into Hbase - BigDecimalSplitter java.lang.ArrayIndexOutOfBoundsException
