@@ -618,9 +618,13 @@ public final class SqoopHCatUtilities {
       }
       if (type.equals("char") || type.equals("varchar")) {
         prec = dbColumnInfo.get(col).get(1);
-        if (prec > MAX_HIVE_CHAR_PREC) {
-          LOG.warn("Truncating precison of column " + col + "  from " + prec
-            + " to " + MAX_HIVE_CHAR_PREC);
+        if (prec > MAX_HIVE_CHAR_PREC || prec <= 0) {
+          if (prec <= 0) {
+            LOG.warn("Setting precison of column " + col + " to "
+                    + MAX_HIVE_CHAR_PREC + " as DB has no precision information");
+          } else {
+            LOG.warn("Truncating precison of column " + col + "  from " + prec + " to " + MAX_HIVE_CHAR_PREC);
+          }
           prec = MAX_HIVE_CHAR_PREC;
         }
       } else if (type.equals("decimal")) {
