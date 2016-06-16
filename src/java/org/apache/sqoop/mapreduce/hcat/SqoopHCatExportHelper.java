@@ -22,12 +22,16 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DefaultStringifier;
 import org.apache.hadoop.io.IntWritable;
@@ -43,6 +47,13 @@ import org.apache.hive.hcatalog.mapreduce.InputJobInfo;
 import org.apache.sqoop.lib.SqoopRecord;
 import org.apache.sqoop.mapreduce.ExportJobBase;
 import org.apache.sqoop.mapreduce.ImportJobBase;
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.Version;
+import org.codehaus.jackson.map.JsonSerializer;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.SerializerProvider;
+import org.codehaus.jackson.map.module.SimpleModule;
 
 /**
  * Helper class for Sqoop HCat Integration export jobs.
@@ -57,6 +68,8 @@ public class SqoopHCatExportHelper {
   private static final String TIMESTAMP_TYPE = "java.sql.Timestamp";
   private static final String TIME_TYPE = "java.sql.Time";
   private static final String DATE_TYPE = "java.sql.Date";
+  private static final String MAP_TYPE = "java.util.Map";
+  private static final String LIST_TYPE = "java.util.List";
   private static final String BIG_DECIMAL_TYPE = "java.math.BigDecimal";
   private static final String FLOAT_TYPE = "Float";
   private static final String DOUBLE_TYPE = "Double";
@@ -71,6 +84,21 @@ public class SqoopHCatExportHelper {
   private static boolean debugHCatExportMapper = false;
   private MapWritable colTypesJava;
   private MapWritable colTypesSql;
+  private ObjectMapper mapper;
+
+  public static ThreadLocal<SimpleDateFormat> dateFormat = new ThreadLocal<SimpleDateFormat>() {
+    @Override
+    protected SimpleDateFormat initialValue() {
+      return new SimpleDateFormat("yyyy-MM-dd");
+    }
+  };
+
+  public static ThreadLocal<SimpleDateFormat> timestampFormat = new ThreadLocal<SimpleDateFormat>() {
+    @Override
+    protected SimpleDateFormat initialValue() {
+      return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    }
+  };
 
   public SqoopHCatExportHelper(Configuration conf)
     throws IOException, InterruptedException {
@@ -118,6 +146,17 @@ public class SqoopHCatExportHelper {
     for (HCatFieldSchema hfs : partitionSchema.getFields()) {
       hCatFullTableSchema.append(hfs);
     }
+
+    mapper = new ObjectMapper();
+    SimpleModule hiveTypesModule = new SimpleModule("HiveTypesModule", Version.unknownVersion());
+    hiveTypesModule.addSerializer(HiveVarchar.class, new HiveVarcharSerializer());
+    hiveTypesModule.addSerializer(HiveChar.class, new HiveCharSerializer());
+    hiveTypesModule.addSerializer(HiveDecimal.class, new HiveDecimalSerializer());
+    hiveTypesModule.addSerializer(Date.class, new DateSerializer());
+    hiveTypesModule.addSerializer(Timestamp.class, new TimestampSerializer());
+
+    mapper.registerModule(hiveTypesModule);
+
   }
 
   public SqoopRecord convertToSqoopRecord(HCatRecord hcr)
@@ -232,6 +271,11 @@ public class SqoopHCatExportHelper {
       case ARRAY:
       case MAP:
       case STRUCT:
+        val = convertComplexTypes(val, javaColType);
+        if (val != null) {
+          return val;
+        }
+        break;
       default:
         throw new IOException("Cannot convert HCatalog type "
           + fieldType);
@@ -382,5 +426,53 @@ public class SqoopHCatExportHelper {
       return n.toString();
     }
     return null;
+  }
+
+  private Object convertComplexTypes(Object val, String javaColType) throws IOException {
+    if (javaColType.equals(STRING_TYPE)) {
+      return mapper.writeValueAsString(val);
+    } else if (val instanceof List && javaColType.equals(LIST_TYPE)) {
+      return  val;
+    } else if (val instanceof Map && javaColType.equals(MAP_TYPE)) {
+      return  val;
+    }
+    return null;
+  }
+
+
+  public static class HiveVarcharSerializer extends JsonSerializer<HiveVarchar> {
+    @Override
+    public void serialize(HiveVarchar value, JsonGenerator jgen, SerializerProvider provider)
+            throws IOException, JsonProcessingException {
+      jgen.writeString(value.toString());
+    }
+  }
+  public static class HiveCharSerializer extends JsonSerializer<HiveChar> {
+    @Override
+    public void serialize(HiveChar value, JsonGenerator jgen, SerializerProvider provider)
+            throws IOException, JsonProcessingException {
+      jgen.writeString(value.toString());
+    }
+  }
+  public static class HiveDecimalSerializer extends JsonSerializer<HiveDecimal> {
+    @Override
+    public void serialize(HiveDecimal value, JsonGenerator jgen, SerializerProvider provider)
+            throws IOException, JsonProcessingException {
+      jgen.writeString(value.toString());
+    }
+  }
+  public static class DateSerializer extends JsonSerializer<Date> {
+    @Override
+    public void serialize(Date value, JsonGenerator jgen, SerializerProvider provider)
+            throws IOException, JsonProcessingException {
+      jgen.writeString(dateFormat.get().format(value));
+    }
+  }
+  public static class TimestampSerializer extends JsonSerializer<Timestamp> {
+    @Override
+    public void serialize(Timestamp value, JsonGenerator jgen, SerializerProvider provider)
+            throws IOException, JsonProcessingException {
+      jgen.writeString(timestampFormat.get().format(value));
+    }
   }
 }

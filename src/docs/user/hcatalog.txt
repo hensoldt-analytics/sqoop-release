@@ -316,10 +316,74 @@ column will abort the Sqoop job.
 Support for HCatalog Data Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-All the primitive Hive types that are part of Hive 0.13 version are supported.
-Currently all the complex HCatalog types are not supported.
+Primitive types
+^^^^^^^^^^^^^^^
 
+All the primitive Hive types that are part of Hive 0.13 version are supported.
 BLOB/CLOB database types are only supported for imports.
+
+Complex types
+^^^^^^^^^^^^^
+
+Now Sqoop supports Array, Map and Struct complex types.  The Hive complex
+column must be mapped to a character type field on the db store.  The DB
+store representation of the complex value should be the JSON serialized
+string of the value.   On export, Sqoop will transfer the value as a JSON
+serialize string value.
+
+Arrays are represented as '[' elemType,.... ']' where elemType is the JSON
+serialized form of the array element.
+Maps are represented as '{' keyType : valueType,.... ']' where keyType is the
+JSON representation of the primitive keyType and valueType is the JSON
+representation of the value.
+Structs are represented as '[' member1Type,...,memberNType ']' where each memberType is the JSON representation of the member value.
+Date values have the serialized form:  yyyy-MM-dd
+Timestamp values have the serialized form: yyyy-MM-dd hh:mm:ss
+Hive varchar values have the string representation of the character string
+Hive char values have the string representation of the character string
+with padding as needed.
+
+For example, if a Hive column has the type
+
+--------------------------------------
+
+array<
+   map<string,
+       struct<
+          ti:tinyint,
+          si:smallint,
+          i:int,
+          bi:bigint,
+          bo:boolean,
+          de:decimal(38,10),
+          f:float,
+          d:double,
+          dt:date,
+          ts:timestamp,
+          s:string,
+          vc:varchar(20),
+          c:char(20)
+        >
+   >
+>
+
+--------------------------------------
+
+An example JSON serialized string for the column value (with 2 array elements,
+each array element (being  a map) has one key value pair, and each value is a
+struct representing all the supported hive primitive types and their JSON
+representation.
+
+--------------------------------------
+
+[{"200":[10,1412,1861165759,1549139784377866219,false,"1239325638653059136",0.1191555,0.142393048952381,"2016-05-09","2016-05-09 12:18:31","this is a test","this is a varchar","this is a char      "]},{"201":[20,2412,-1433801537,2549139784377866219,true,"2239325638653059136",0.2191555,0.242393048952381,"2016-05-09","2016-05-09 12:18:31","this is a test","this is a varchar","this is a char      "]}]
+
+--------------------------------------
+
+Note that if the data in the data store is formatted, during import, the JSON
+string will be properly parsed and converted into Hive complex data.
+During export, the default JSON format as shown above will be stored into
+the column.
 
 Providing Hive and HCatalog Libraries for the Sqoop Job
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
