@@ -18,34 +18,42 @@
 
 package org.apache.sqoop;
 
-import com.cloudera.sqoop.hive.HiveImport;
 import com.cloudera.sqoop.testutil.CommonArgs;
-import com.cloudera.sqoop.testutil.ImportJobTestCase;
-import com.cloudera.sqoop.tool.ImportTool;
+import com.cloudera.sqoop.testutil.ExportJobTestCase;
+import com.cloudera.sqoop.tool.ExportTool;
 import com.cloudera.sqoop.tool.SqoopTool;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.type.HiveChar;
+import org.apache.hadoop.hive.common.type.HiveVarchar;
+import org.apache.hive.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.sqoop.config.ConfigurationConstants;
+import org.apache.sqoop.hcat.HCatalogTestUtils;
 import org.junit.Test;
 
 import java.io.File;
-import java.io.IOException;
+import java.sql.Types;
 import java.util.ArrayList;
 
-public class TestSqoopJobDataPublisher extends ImportJobTestCase {
+public class TestExportSqoopJobDataPublisher extends ExportJobTestCase {
 
-    public static final Log LOG = LogFactory.getLog(TestSqoopJobDataPublisher.class.getName());
+    public static final Log LOG = LogFactory.getLog(TestExportSqoopJobDataPublisher.class.getName());
+    private HCatalogTestUtils utils = HCatalogTestUtils.instance();
 
     public void setUp() {
         super.setUp();
-        HiveImport.setTestMode(true);
+        try {
+            utils.initUtils();
+        } catch (Exception e) {
+            throw new RuntimeException("Error initializing HCatTestUtilis", e);
+        }
     }
 
     public void tearDown() {
         super.tearDown();
-        HiveImport.setTestMode(false);
     }
+
     /**
      * Create the argv to pass to Sqoop.
      * @return the argv as an array of strings.
@@ -68,21 +76,11 @@ public class TestSqoopJobDataPublisher extends ImportJobTestCase {
 
         args.add("--table");
         args.add(getTableName());
-        args.add("--warehouse-dir");
-        args.add(getWarehouseDir());
+        args.add("--verbose");
+        args.add("--hcatalog-table");
+        args.add(getTableName());
         args.add("--connect");
         args.add(getConnectString());
-        args.add("--hive-import");
-        String [] colNames = getColNames();
-        if (null != colNames) {
-            args.add("--split-by");
-            args.add(colNames[0]);
-        } else {
-            fail("Could not determine column names.");
-        }
-
-        args.add("--num-mappers");
-        args.add("1");
 
         for (String a : args) {
             LOG.debug("ARG : "+ a);
@@ -91,29 +89,27 @@ public class TestSqoopJobDataPublisher extends ImportJobTestCase {
         return args.toArray(new String[0]);
     }
 
-    private void runImportTest(String tableName, String [] types,
-                               String [] values, String verificationScript, String [] args,
-                               SqoopTool tool) throws IOException {
+    private void runExportTest(HCatalogTestUtils.ColumnGenerator[] cols, String verificationScript, String [] args,
+                               SqoopTool tool) throws Exception {
 
         // create a table and populate it with a row...
-        createTableWithColTypes(types, values);
+        utils.createHCatTable(HCatalogTestUtils.CreateMode.CREATE_AND_LOAD, 3, getTableName(), cols);
 
         // set up our mock hive shell to compare our generated script
         // against the correct expected one.
-        com.cloudera.sqoop.SqoopOptions options = getSqoopOptions(args, tool);
-        String hiveHome = options.getHiveHome();
-        assertNotNull("hive.home was not set", hiveHome);
-        String testDataPath = new Path(new Path(hiveHome),
+        SqoopOptions options = getSqoopOptions(args, tool);
+        String hcatHome = options.getHCatHome();
+        String testDataPath = new Path(new Path(hcatHome),
                 "scripts/" + verificationScript).toString();
         System.setProperty("expected.script",
                 new File(testDataPath).getAbsolutePath());
 
         // verify that we can import it correctly into hive.
-        runImport(tool, args);
+        runExport(args);
     }
 
-    private com.cloudera.sqoop.SqoopOptions getSqoopOptions(String [] args, SqoopTool tool) {
-        com.cloudera.sqoop.SqoopOptions opts = null;
+    private SqoopOptions getSqoopOptions(String [] args, SqoopTool tool) {
+        SqoopOptions opts = null;
         try {
             opts = tool.parseArguments(args, null, null, true);
         } catch (Exception e) {
@@ -123,29 +119,30 @@ public class TestSqoopJobDataPublisher extends ImportJobTestCase {
         return opts;
     }
 
-    protected void setNumCols(int numCols) {
-        String [] cols = new String[numCols];
-        for (int i = 0; i < numCols; i++) {
-            cols[i] = "DATA_COL" + i;
-        }
-
-        setColNames(cols);
-    }
-
     /** Test that strings and ints are handled in the normal fashion. */
     @Test
-    public void testNormalHiveImport() throws IOException {
-        final String TABLE_NAME = "NORMAL_HIVE_IMPORT";
+    public void testHcatExport() throws Exception {
+        final String TABLE_NAME = "NORMAL_HCAT_EXPORT";
         setCurTableName(TABLE_NAME);
-        setNumCols(3);
-        String [] types = { "VARCHAR(32)", "INTEGER", "CHAR(64)" };
-        String [] vals = { "'test'", "42", "'somestring'" };
-        runImportTest(TABLE_NAME, types, vals, "normalImport.q",
-                getArgv(false, null), new ImportTool());
-        assert (DummyDataPublisher.hiveTable.equals("NORMAL_HIVE_IMPORT"));
-        assert (DummyDataPublisher.storeTable.equals("NORMAL_HIVE_IMPORT"));
+        HCatalogTestUtils.ColumnGenerator[] cols = new HCatalogTestUtils.ColumnGenerator[] {
+                HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                        "char(14)", Types.CHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                        "string to test", "string to test", HCatalogTestUtils.KeyType.NOT_A_KEY),
+                HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                        "char(14)", Types.CHAR, HCatFieldSchema.Type.CHAR, 14, 0,
+                        new HiveChar("string to test", 14), "string to test",
+                        HCatalogTestUtils.KeyType.NOT_A_KEY),
+                HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                        "char(14)", Types.CHAR, HCatFieldSchema.Type.VARCHAR, 14, 0,
+                        new HiveVarchar("string to test", 14), "string to test",
+                        HCatalogTestUtils.KeyType.NOT_A_KEY),
+                HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
+                        "longvarchar", Types.LONGVARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                        "string to test", "string to test", HCatalogTestUtils.KeyType.NOT_A_KEY),
+        };
+        runExportTest(cols, "normalImport.q", getArgv(false, (String[])null), new ExportTool());
+        assert (DummyDataPublisher.storeTable.equals("NORMAL_HCAT_EXPORT"));
         assert (DummyDataPublisher.storeType.equals("hsqldb"));
         assert (DummyDataPublisher.operation.equals("import"));
     }
-
 }
