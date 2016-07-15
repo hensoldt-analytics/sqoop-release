@@ -80,16 +80,3 @@
    SQOOP-2283: Support usage of --exec and --password-alias
    SQOOP-2286: Ensure Sqoop generates valid avro column names
 
-
-INCOMPATIBLE CHANGES
-   None
-
-NEW FEATURES
-   None
-
-IMPROVEMENTS
-   None
-
-BUG FIXES
-   SQOOP-2364: Fix Netezza trunc-string option handling and unnecessary log directory during imports
-
