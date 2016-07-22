@@ -285,8 +285,7 @@ public class TestHiveImport extends ImportJobTestCase {
 
   /** Test that strings and ints are handled in the normal fashion as parquet
    * file. */
-  @Test
-  public void testNormalHiveImportAsParquet() throws IOException {
+  public void disabledTestNormalHiveImportAsParquet() throws IOException {
     final String TABLE_NAME = "NORMAL_HIVE_IMPORT_AS_PARQUET";
     setCurTableName(TABLE_NAME);
     setNumCols(3);
@@ -372,8 +371,7 @@ public class TestHiveImport extends ImportJobTestCase {
    * Test that table is created in hive and replaces the existing table if
    * any.
    */
-  @Test
-  public void testCreateOverwriteHiveImportAsParquet() throws IOException {
+  public void disabledTestCreateOverwriteHiveImportAsParquet() throws IOException {
     final String TABLE_NAME = "CREATE_OVERWRITE_HIVE_IMPORT_AS_PARQUET";
     setCurTableName(TABLE_NAME);
     setNumCols(3);
@@ -395,8 +393,8 @@ public class TestHiveImport extends ImportJobTestCase {
   /**
    * Test that records are appended to an existing table.
    */
-  @Test
-  public void testAppendHiveImportAsParquet() throws IOException {
+
+  public void disableTestAppendHiveImportAsParquet() throws IOException {
     final String TABLE_NAME = "APPEND_HIVE_IMPORT_AS_PARQUET";
     setCurTableName(TABLE_NAME);
     setNumCols(3);
@@ -442,7 +440,7 @@ public class TestHiveImport extends ImportJobTestCase {
   /** If bin/hive returns an error exit status, we should get an IOException. */
   @Test
   public void testHiveExitFails() {
-    // The expected script is different than the one which would be generated
+    // The expected script i's different than the one which would be generated
     // by this, so we expect an IOException out.
     final String TABLE_NAME = "FAILING_HIVE_IMPORT";
     setCurTableName(TABLE_NAME);
