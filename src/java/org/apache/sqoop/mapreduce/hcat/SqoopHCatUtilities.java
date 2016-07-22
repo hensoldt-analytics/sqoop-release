@@ -1068,6 +1068,7 @@ public final class SqoopHCatUtilities {
      case Types.TIME:
      case Types.TIMESTAMP:
      case Types.CLOB:
+     case Types.NCLOB:
        return "string";
 
      case Types.FLOAT:
