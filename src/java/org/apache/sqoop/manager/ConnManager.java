@@ -145,7 +145,8 @@ public abstract class ConnManager {
     } else if (sqlType == Types.BINARY
         || sqlType == Types.VARBINARY) {
       return BytesWritable.class.getName();
-    } else if (sqlType == Types.CLOB) {
+    } else if (sqlType == Types.CLOB
+        || sqlType == Types.NCLOB) {
       return ClobRef.class.getName();
     } else if (sqlType == Types.BLOB
         || sqlType == Types.LONGVARBINARY) {
