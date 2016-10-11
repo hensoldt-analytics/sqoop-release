@@ -18,6 +18,21 @@
 
 package org.apache.sqoop.manager;
 
+import com.cloudera.sqoop.SqoopOptions;
+import com.cloudera.sqoop.SqoopOptions.UpdateMode;
+import com.cloudera.sqoop.mapreduce.ExportBatchOutputFormat;
+import com.cloudera.sqoop.mapreduce.JdbcExportJob;
+import com.cloudera.sqoop.mapreduce.JdbcUpsertExportJob;
+import com.cloudera.sqoop.mapreduce.OracleUpsertOutputFormat;
+import com.cloudera.sqoop.mapreduce.db.OracleDataDrivenDBInputFormat;
+import com.cloudera.sqoop.util.ExportException;
+import com.cloudera.sqoop.util.ImportException;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.sqoop.manager.oracle.OracleUtils;
+import org.apache.sqoop.util.LoggingUtils;
+
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.sql.Connection;
@@ -39,22 +54,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
-
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.sqoop.manager.oracle.OracleUtils;
-import org.apache.sqoop.util.LoggingUtils;
-
-import com.cloudera.sqoop.SqoopOptions;
-import com.cloudera.sqoop.SqoopOptions.UpdateMode;
-import com.cloudera.sqoop.mapreduce.ExportBatchOutputFormat;
-import com.cloudera.sqoop.mapreduce.JdbcExportJob;
-import com.cloudera.sqoop.mapreduce.JdbcUpsertExportJob;
-import com.cloudera.sqoop.mapreduce.OracleUpsertOutputFormat;
-import com.cloudera.sqoop.mapreduce.db.OracleDataDrivenDBInputFormat;
-import com.cloudera.sqoop.util.ExportException;
-import com.cloudera.sqoop.util.ImportException;
 
 /**
  * Manages connections to Oracle databases.
@@ -443,6 +442,15 @@ public class OracleManager
     // Specify the Oracle-specific DBInputFormat for import.
     context.setInputFormat(OracleDataDrivenDBInputFormat.class);
     super.importTable(context);
+  }
+
+  @Override
+  public void importQuery(com.cloudera.sqoop.manager.ImportJobContext context)
+          throws IOException, ImportException {
+    context.setConnManager(this);
+    // Specify the Oracle-specific DBInputFormat for import.
+    context.setInputFormat(OracleDataDrivenDBInputFormat.class);
+    super.importQuery(context);
   }
 
   /**
