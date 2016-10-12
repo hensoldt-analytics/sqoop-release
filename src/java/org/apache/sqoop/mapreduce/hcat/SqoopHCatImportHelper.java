@@ -638,6 +638,9 @@ public class SqoopHCatImportHelper {
         return hChar;
       case DECIMAL:
         DecimalTypeInfo dti = (DecimalTypeInfo) typeInfo;
+        if (n instanceof BigDecimal) {
+          return HiveDecimal.create((BigDecimal)n);
+        }
         BigDecimal bd = new BigDecimal(n.doubleValue(), new MathContext(dti.precision(), RoundingMode.HALF_UP));
         bd.setScale(dti.scale(), BigDecimal.ROUND_HALF_UP);
         return HiveDecimal.create(bd);
