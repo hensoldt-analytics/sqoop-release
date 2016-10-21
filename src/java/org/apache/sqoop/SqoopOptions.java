@@ -18,17 +18,14 @@
 
 package org.apache.sqoop;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Field;
-import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Properties;
-
+import com.cloudera.sqoop.SqoopOptions.FileLayout;
+import com.cloudera.sqoop.SqoopOptions.IncrementalMode;
+import com.cloudera.sqoop.SqoopOptions.UpdateMode;
+import com.cloudera.sqoop.lib.DelimiterSet;
+import com.cloudera.sqoop.lib.LargeObjectLoader;
+import com.cloudera.sqoop.tool.SqoopTool;
+import com.cloudera.sqoop.util.RandomHash;
+import com.cloudera.sqoop.util.StoredAsProperty;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -42,14 +39,16 @@ import org.apache.sqoop.validation.AbortOnFailureHandler;
 import org.apache.sqoop.validation.AbsoluteValidationThreshold;
 import org.apache.sqoop.validation.RowCountValidator;
 
-import com.cloudera.sqoop.SqoopOptions.FileLayout;
-import com.cloudera.sqoop.SqoopOptions.IncrementalMode;
-import com.cloudera.sqoop.SqoopOptions.UpdateMode;
-import com.cloudera.sqoop.lib.DelimiterSet;
-import com.cloudera.sqoop.lib.LargeObjectLoader;
-import com.cloudera.sqoop.tool.SqoopTool;
-import com.cloudera.sqoop.util.RandomHash;
-import com.cloudera.sqoop.util.StoredAsProperty;
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
+import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
 
 /**
  * Configurable state used by Sqoop tools.
@@ -184,6 +183,7 @@ public class SqoopOptions implements Cloneable {
   @StoredAsProperty("hcatalog.storage.stanza")
   private String hCatStorageStanza;
   private String hCatHome; // not serialized to metastore.
+  @StoredAsProperty("skip.dist.cache")
   private boolean skipDistCache;
   @StoredAsProperty("hcatalog.partition.keys")
     private String hCatalogPartitionKeys;
