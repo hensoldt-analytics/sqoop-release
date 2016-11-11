@@ -441,6 +441,9 @@ public class SqoopHCatImportHelper {
       HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
       return hChar;
     } else if (hfsType == HCatFieldSchema.Type.DECIMAL) {
+      if (n instanceof BigDecimal) {
+        return HiveDecimal.create((BigDecimal)n);  
+      }
       BigDecimal bd = new BigDecimal(n.doubleValue(),
         MathContext.DECIMAL128);
       return HiveDecimal.create(bd);
