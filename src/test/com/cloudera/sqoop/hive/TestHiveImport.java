@@ -18,24 +18,6 @@
 
 package com.cloudera.sqoop.hive;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.SqoopOptions.InvalidOptionsException;
 import com.cloudera.sqoop.testutil.CommonArgs;
@@ -45,10 +27,27 @@ import com.cloudera.sqoop.tool.CodeGenTool;
 import com.cloudera.sqoop.tool.CreateHiveTableTool;
 import com.cloudera.sqoop.tool.ImportTool;
 import com.cloudera.sqoop.tool.SqoopTool;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.kitesdk.data.Dataset;
 import org.kitesdk.data.DatasetReader;
 import org.kitesdk.data.Datasets;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Test HiveImport capability after an import to HDFS.
@@ -412,6 +411,27 @@ public class TestHiveImport extends ImportJobTestCase {
     verifyHiveDataset(TABLE_NAME, new Object[][] {
         {"test2", 4242, "somestring2"}, {"test", 42, "somestring"}});
   }
+
+  /**
+   * Test hive create and --as-parquetfile options validation.
+   */
+  @Test
+  public void testCreateHiveImportAsParquet() throws ParseException {
+    final String TABLE_NAME = "CREATE_HIVE_IMPORT_AS_PARQUET";
+    setCurTableName(TABLE_NAME);
+    setNumCols(3);
+    String [] extraArgs = {"--as-parquetfile", "--create-hive-table"};
+    ImportTool tool = new ImportTool();
+
+    try {
+      tool.validateOptions(tool.parseArguments(getArgv(false, extraArgs), null,
+          null, true));
+      fail("Expected InvalidOptionsException");
+    } catch (InvalidOptionsException ex) {
+      /* success */
+    }
+  }
+
 
   /** Test that dates are coerced properly to strings. */
   @Test
