@@ -54,17 +54,17 @@ under the License.
 
   <resolvers>
     <ibiblio name="maven2" root="${repo.maven.org}"
-        pattern="${maven2.pattern.ext}" m2compatible="true"/>
+        pattern="${maven2.pattern.ext}" m2compatible="true" checksums=""/>
     <ibiblio name="datanucleus" root="${www.datanucleus.org}"
-        pattern="${maven2.pattern.ext}" m2compatible="true"/>
+        pattern="${maven2.pattern.ext}" m2compatible="true" checksums=""/>
     <ibiblio name="cloudera-releases" root="${releases.cloudera.com}"
-        pattern="${maven2.pattern.ext}" m2compatible="true"/>
+        pattern="${maven2.pattern.ext}" m2compatible="true" checksums=""/>
     <ibiblio name="apache-snapshot" root="${snapshot.apache.org}"
-        m2compatible="true" checkmodified="true" changingPattern=".*SNAPSHOT"/>
+        m2compatible="true" checkmodified="true" changingPattern=".*SNAPSHOT" checksums=""/>
     <ibiblio name="cloudera-staging" root="${staging.cloudera.com}"
-        m2compatible="true" checkmodified="true" changingPattern=".*SNAPSHOT"/>
+        m2compatible="true" checkmodified="true" changingPattern=".*SNAPSHOT" checksums=""/>
 
-    <filesystem name="fs" m2compatible="true">
+    <filesystem name="fs" m2compatible="true" checksums="">
        <artifact pattern="${repo.dir}/[organisation]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"/>
        <ivy pattern="${repo.dir}/[organisation]/[module]/[revision]/[module]-[revision].pom"/>
     </filesystem>
