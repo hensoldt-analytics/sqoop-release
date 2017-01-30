@@ -399,8 +399,12 @@ public class HCatalogImportTest extends ImportJobTestCase {
         "2000", new BigDecimal("2000"), KeyType.NOT_A_KEY),
       HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
           "decimal(18,2)", Types.DECIMAL, HCatFieldSchema.Type.DECIMAL, 18, 2,
-          HiveDecimal.create(new BigDecimal("2000")),
-          new BigDecimal("2000"), KeyType.NOT_A_KEY),
+          HiveDecimal.create(new BigDecimal("2000")), new BigDecimal("2000"),
+          KeyType.NOT_A_KEY),
+      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
+        "decimal(22,5)", Types.DECIMAL, HCatFieldSchema.Type.DECIMAL, 22, 5,
+        HiveDecimal.create(new BigDecimal("87658675864540185.12346")),
+        new BigDecimal("87658675864540185.123456789123456789"), KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     setExtraArgs(addlArgsArray);
@@ -962,7 +966,7 @@ public class HCatalogImportTest extends ImportJobTestCase {
             HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
                     "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
                     "2", "2", KeyType.DYNAMIC_KEY),
-            HCatalogTestUtils.colGeneratorWithHCatType("COMPLEXCOL", "varchar(100)", Types.VARCHAR,
+            HCatalogTestUtils.colGeneratorWithHCatType("complexcol", "varchar(100)", Types.VARCHAR,
                     HCatFieldSchema.Type.ARRAY, 0, 0, rootObj,
                     "[{\"mykey\":[100,15000,60000,250000000,true,"
                             + "\"8435890390495472793\",0.5,0.75,\"2016-05-05\",\"2016-05-05 10:20:30\""
