@@ -27,6 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Test;
 
 import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.TestExport;
@@ -277,4 +278,20 @@ public class OracleExportTest extends TestExport {
         "--update-key", "id", "--update-mode", "allowinsert")));
     verifyExport(TOTAL_RECORDS);
   }
+
+  @Test
+  public void testExportToTableWithNameEndingWithDollarSign() throws IOException, SQLException {
+    testExportToTableWithName("DOLLAR$");
+  }
+
+  @Test
+  public void testExportToTableWithNameContainingDollarSign() throws IOException, SQLException {
+    testExportToTableWithName("FOO$BAR");
+  }
+
+  @Test
+  public void testExportToTableWithNameContainingHashtag() throws IOException, SQLException {
+    testExportToTableWithName("FOO#BAR");
+  }
+
 }
