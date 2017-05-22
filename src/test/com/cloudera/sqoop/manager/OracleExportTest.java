@@ -32,6 +32,7 @@ import com.cloudera.sqoop.SqoopOptions;
 import com.cloudera.sqoop.TestExport;
 
 import junit.framework.AssertionFailedError;
+import org.junit.Test;
 
 /**
  * Test the OracleManager implementation's exportJob() functionality.
@@ -276,5 +277,20 @@ public class OracleExportTest extends TestExport {
     runExport(getArgv(true, 10, 10, newStrArray(null,
         "--update-key", "id", "--update-mode", "allowinsert")));
     verifyExport(TOTAL_RECORDS);
+  }
+  
+  @Test
+  public void testExportToTableWithNameEndingWithDollarSign() throws IOException, SQLException {
+    testExportToTableWithName("DOLLAR$");
+  }
+
+  @Test
+  public void testExportToTableWithNameContainingDollarSign() throws IOException, SQLException {
+    testExportToTableWithName("FOO$BAR");
+  }
+
+  @Test
+  public void testExportToTableWithNameContainingHashtag() throws IOException, SQLException {
+    testExportToTableWithName("FOO#BAR");
   }
 }
