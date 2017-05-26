@@ -35,7 +35,7 @@ public class TestSqoopJsonUtil {
   public void testGetJsonStringFromMapNullMap() {
     Map<String, String> nullMap = null;
     String resultJsonStr = SqoopJsonUtil.getJsonStringforMap(nullMap);
-    assertEquals("{}", resultJsonStr);
+    assertEquals("null", resultJsonStr);
   }
 
   @Test

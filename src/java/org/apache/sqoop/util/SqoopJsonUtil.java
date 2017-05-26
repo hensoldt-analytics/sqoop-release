@@ -23,13 +23,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.gson.Gson;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
-import org.json.JSONObject;
 
 public class SqoopJsonUtil {
 
@@ -40,8 +40,8 @@ public class SqoopJsonUtil {
   }
 
   public static String getJsonStringforMap(Map<String, String> map) {
-    JSONObject pathPartMap = new JSONObject(map);
-    return pathPartMap.toString();
+    Gson pathPartMapGson = new Gson();
+    return pathPartMapGson.toJson(map);
   }
 
   public static Map<String, String> getMapforJsonString(String mapJsonStr) {
