@@ -80,3 +80,6 @@
    SQOOP-2283: Support usage of --exec and --password-alias
    SQOOP-2286: Ensure Sqoop generates valid avro column names
 
+    BUG-107778 SQOOP-3139: sqoop tries to re execute select query during import
+    in case of a connection reset error and this is causing lots of duplicate
+    records from source
