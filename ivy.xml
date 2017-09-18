@@ -225,6 +225,7 @@ under the License.
       <exclude org="org.apache.thrift" module="thrift"/>
       <exclude org="log4j" module="log4j"/>
       <exclude org="org.apache.hadoop" module="hadoop-core" />
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="com.cloudera.cdh" module="zookeeper-ant" />
     </dependency>
 
@@ -232,6 +233,7 @@ under the License.
     <dependency org="org.apache.hbase" name="hbase-client" rev="${hbase95.version}" conf="hbase95->default">
       <artifact name="hbase-client" type="jar"/>
       <artifact name="hbase-client" type="test-jar" ext="jar" m:classifier="tests"/>
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="com.sun.jersey" module="jersey-core"/>
       <exclude org="com.sun.jersey" module="jersey-json"/>
       <exclude org="com.sun.jersey" module="jersey-server"/>
@@ -244,12 +246,14 @@ under the License.
       <exclude org="com.sun.jersey" module="jersey-core"/>
       <exclude org="com.sun.jersey" module="jersey-json"/>
       <exclude org="com.sun.jersey" module="jersey-server"/>
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="org.apache.thrift" module="thrift"/>
       <exclude org="log4j" module="log4j"/>
     </dependency>
     <dependency org="org.apache.hbase" name="hbase-server" rev="${hbase95.version}" conf="hbase95->default">
       <artifact name="hbase-server" type="jar"/>
       <artifact name="hbase-server" type="test-jar" ext="jar" m:classifier="tests"/>
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="com.sun.jersey" module="jersey-core"/>
       <exclude org="com.sun.jersey" module="jersey-json"/>
       <exclude org="com.sun.jersey" module="jersey-server"/>
@@ -259,6 +263,7 @@ under the License.
     <dependency org="org.apache.hbase" name="hbase-hadoop-compat" rev="${hbase95.version}" conf="hbase95->default">
       <artifact name="hbase-hadoop-compat" type="jar"/>
       <artifact name="hbase-hadoop-compat" type="test-jar" ext="jar" m:classifier="tests"/>
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="com.sun.jersey" module="jersey-core"/>
       <exclude org="com.sun.jersey" module="jersey-json"/>
       <exclude org="com.sun.jersey" module="jersey-server"/>
@@ -268,6 +273,7 @@ under the License.
     <dependency org="org.apache.hbase" name="hbase-hadoop-compat" rev="${hbase95.version}" conf="hbase95->default">
       <artifact name="hbase-hadoop-compat" type="jar"/>
       <artifact name="hbase-hadoop-compat" type="test-jar" ext="jar" m:classifier="tests"/>
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="com.sun.jersey" module="jersey-core"/>
       <exclude org="com.sun.jersey" module="jersey-json"/>
       <exclude org="com.sun.jersey" module="jersey-server"/>
@@ -277,6 +283,7 @@ under the License.
     <dependency org="org.apache.hbase" name="hbase-hadoop1-compat" rev="${hbase95.version}" conf="hbasecompat1->default">
       <artifact name="hbase-hadoop1-compat" type="jar"/>
       <artifact name="hbase-hadoop1-compat" type="test-jar" ext="jar" m:classifier="tests"/>
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="com.sun.jersey" module="jersey-core"/>
       <exclude org="com.sun.jersey" module="jersey-json"/>
       <exclude org="com.sun.jersey" module="jersey-server"/>
@@ -286,6 +293,7 @@ under the License.
     <dependency org="org.apache.hbase" name="hbase-hadoop2-compat" rev="${hbase95.version}" conf="hbasecompat2->default">
       <artifact name="hbase-hadoop2-compat" type="jar"/>
       <artifact name="hbase-hadoop2-compat" type="test-jar" ext="jar" m:classifier="tests"/>
+      <exclude org="org.apache.hadoop" module="hadoop-aws" />
       <exclude org="com.sun.jersey" module="jersey-core"/>
       <exclude org="com.sun.jersey" module="jersey-json"/>
       <exclude org="com.sun.jersey" module="jersey-server"/>
@@ -332,6 +340,5 @@ under the License.
     <exclude org="org.apache.hadoop" module="avro"/>
     <exclude org="commons-daemon" module="commons-daemon" />
     <exclude type="pom" />
-
   </dependencies>
 </ivy-module>
