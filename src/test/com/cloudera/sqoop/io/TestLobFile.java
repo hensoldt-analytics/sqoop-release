@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.net.URI;
 import java.nio.CharBuffer;
 
 import junit.framework.TestCase;
@@ -32,8 +33,27 @@ import junit.framework.TestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.hadoop.crypto.JceAesCtrCryptoCodec;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.junit.Before;
+
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Answers.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.withSettings;
+
+import org.junit.Rule;
+import org.junit.rules.ExpectedException;
 
 /**
  * Test the LobFile reader/writer implementation.
@@ -574,5 +594,39 @@ public class TestLobFile extends TestCase {
       LOG.info("Got unsupported codec exception for lzo; expected -- good.");
     }
   }
+
+  @Test
+  public void testCryptoOutputStreamClosingDoesNotThrowExceptionAndClosedProperly() throws Exception {
+    // Tests that closing CryptoOutputStream doesn't throw exception neither with Java 7 nor with Java 8
+    // For a detailed explanation see SQOOP-3243
+    CryptoOutputStream cryptoOutputStream = createCryptoOutputStream();
+    FSDataOutputStream wrappedCryptoOutputStream = new FSDataOutputStream(cryptoOutputStream, null);
+
+    Path mockPath = spy(new Path("file://" + TEMP_BASE_DIR, "binary.lob"));
+    FileSystem mockFileSystem = mock(FileSystem.class, withSettings().defaultAnswer(CALLS_REAL_METHODS.get()));
+
+    doReturn(mockFileSystem).when(mockPath).getFileSystem(conf);
+    doReturn(null).when(mockFileSystem).getWorkingDirectory();
+    doReturn(wrappedCryptoOutputStream).when(mockFileSystem).create(mockPath);
+    doReturn(new URI("file:///")).when(mockFileSystem).getUri();
+
+    LobFile.Writer writer = LobFile.create(mockPath, conf);
+
+    writer.close();
+
+    verify(cryptoOutputStream).close();
+  }
+
+
+  public CryptoOutputStream createCryptoOutputStream() throws Exception {
+    final byte[] BYTES = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    Path p = new Path(TEMP_BASE_DIR, "binary.lob");
+
+    FSDataOutputStream fsDataOutputStream = fs.create(p);
+    CryptoOutputStream cryptoOutputStream = spy(new CryptoOutputStream(fsDataOutputStream, new JceAesCtrCryptoCodec(), 512, BYTES, BYTES));
+
+    return cryptoOutputStream;
+  }
+
 }
 
