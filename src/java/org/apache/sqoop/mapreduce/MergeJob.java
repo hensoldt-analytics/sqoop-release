@@ -50,11 +50,11 @@ import org.kitesdk.data.DatasetDescriptor;
 import org.kitesdk.data.Datasets;
 import org.kitesdk.data.Formats;
 import org.kitesdk.data.mapreduce.DatasetKeyOutputFormat;
-import parquet.avro.AvroParquetInputFormat;
-import parquet.avro.AvroSchemaConverter;
-import parquet.hadoop.Footer;
-import parquet.hadoop.ParquetFileReader;
-import parquet.schema.MessageType;
+import org.apache.parquet.avro.AvroParquetInputFormat;
+import org.apache.parquet.avro.AvroSchemaConverter;
+import org.apache.parquet.hadoop.Footer;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.schema.MessageType;
 
 import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.mapreduce.JobBase;

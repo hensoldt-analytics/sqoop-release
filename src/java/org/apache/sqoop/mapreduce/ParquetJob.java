@@ -23,11 +23,15 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.utils.SecurityUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hive.hcatalog.common.HCatUtil;
 import org.apache.sqoop.avro.AvroSchemaMismatchException;
 import org.apache.sqoop.hive.HiveConfig;
 import org.kitesdk.data.CompressionType;
@@ -39,7 +43,6 @@ import org.kitesdk.data.mapreduce.DatasetKeyOutputFormat;
 import org.kitesdk.data.spi.SchemaValidationUtil;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 
 /**
  * Helper class for setting up a Parquet MapReduce job.
@@ -47,8 +50,6 @@ import java.lang.reflect.Method;
 public final class ParquetJob {
 
   public static final Log LOG = LogFactory.getLog(ParquetJob.class.getName());
-
-  public static final String HIVE_METASTORE_CLIENT_CLASS = "org.apache.hadoop.hive.metastore.HiveMetaStoreClient";
 
   public static final String HIVE_METASTORE_SASL_ENABLED = "hive.metastore.sasl.enabled";
   // Purposefully choosing the same token alias as the one Oozie chooses.
@@ -165,39 +166,15 @@ public final class ParquetJob {
    * @param conf
    */
   private static void addHiveDelegationToken(JobConf conf) {
-    // Need to use reflection since there's no compile time dependency on the client libs.
-    Class<?> HiveConfClass;
-    Class<?> HiveMetaStoreClientClass;
-
+    HiveConf hiveConf = new HiveConf(conf, Configuration.class);
     try {
-      HiveMetaStoreClientClass = Class.forName(HIVE_METASTORE_CLIENT_CLASS);
-    } catch (ClassNotFoundException ex) {
-      LOG.error("Could not load " + HIVE_METASTORE_CLIENT_CLASS
-          + " when adding hive delegation token. "
-          + "Make sure HIVE_CONF_DIR is set correctly.", ex);
-      throw new RuntimeException("Couldn't fetch delegation token.", ex);
-    }
+      IMetaStoreClient client = HCatUtil.getHiveMetastoreClient(hiveConf);
+      String owner = SecurityUtils.getUser();
+      String kerberosPrincipal = UserGroupInformation.getLoginUser().getShortUserName();
+      String tokenStringForm = client.getDelegationToken(owner, kerberosPrincipal);
 
-    try {
-      HiveConfClass = Class.forName(HiveConfig.HIVE_CONF_CLASS);
-    } catch (ClassNotFoundException ex) {
-      LOG.error("Could not load " + HiveConfig.HIVE_CONF_CLASS
-          + " when adding hive delegation token."
-          + " Make sure HIVE_CONF_DIR is set correctly.", ex);
-      throw new RuntimeException("Couldn't fetch delegation token.", ex);
-    }
-
-    try {
-      Object client = HiveMetaStoreClientClass.getConstructor(HiveConfClass).newInstance(
-          HiveConfClass.getConstructor(Configuration.class, Class.class).newInstance(conf, Configuration.class)
-      );
-      // getDelegationToken(String kerberosPrincial)
-      Method getDelegationTokenMethod = HiveMetaStoreClientClass.getMethod("getDelegationToken", String.class);
-      Object tokenStringForm = getDelegationTokenMethod.invoke(client, UserGroupInformation.getLoginUser().getShortUserName());
-
-      // Load token
-      Token<DelegationTokenIdentifier> metastoreToken = new Token<DelegationTokenIdentifier>();
-      metastoreToken.decodeFromUrlString(tokenStringForm.toString());
+      Token<DelegationTokenIdentifier> metastoreToken = new Token<>();
+      metastoreToken.decodeFromUrlString(tokenStringForm);
       conf.getCredentials().addToken(new Text(HIVE_METASTORE_TOKEN_ALIAS), metastoreToken);
 
       LOG.debug("Successfully fetched hive metastore delegation token. " + metastoreToken);
