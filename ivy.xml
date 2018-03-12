@@ -92,6 +92,8 @@ under the License.
       rev="${commons-net.version}" conf="common->default"/>
     <dependency org="log4j" name="log4j" rev="${log4j.version}"
       conf="common->master" />
+    <dependency org="org.apache.logging.log4j" name="log4j-api" rev="${log4j2.version}"
+      conf="common->master" />
     <dependency org="junit" name="junit" rev="${junit.version}"
       conf="test->default"/>
     <dependency org="org.assertj" name="assertj-core" rev="${assertj.version}"
