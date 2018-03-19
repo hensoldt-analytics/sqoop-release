@@ -117,7 +117,7 @@ under the License.
       </dependency>
     <dependency org="org.kitesdk" name="kite-data-hive" rev="${kite-data.version}"
       conf="common->default;redist->default">
-      <exclude org="com.twitter" module="parquet-hive-bundle"/>
+      <exclude org="org.apache.parquet" module="parquet-hive-bundle"/>
       <exclude org="org.apache.avro" module="avro" />
     </dependency>
 
