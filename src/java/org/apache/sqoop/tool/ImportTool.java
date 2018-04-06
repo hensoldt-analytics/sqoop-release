@@ -43,6 +43,7 @@ import org.apache.sqoop.SqoopOptions.InvalidOptionsException;
 import org.apache.sqoop.cli.RelatedOptions;
 import org.apache.sqoop.cli.ToolOptions;
 import org.apache.sqoop.hive.HiveImport;
+import org.apache.sqoop.manager.ConnManager;
 import org.apache.sqoop.manager.ImportJobContext;
 import org.apache.sqoop.mapreduce.MergeJob;
 import org.apache.sqoop.metastore.JobData;
@@ -53,6 +54,7 @@ import org.apache.sqoop.orm.TableClassName;
 import org.apache.sqoop.util.AppendUtils;
 import org.apache.sqoop.util.ClassLoaderStack;
 import org.apache.sqoop.util.ImportException;
+import org.apache.sqoop.util.OrcUtil;
 
 import static org.apache.sqoop.manager.SupportedManagers.MYSQL;
 
@@ -77,6 +79,8 @@ public class ImportTool extends BaseSqoopTool {
 
   // Set classloader for local job runner
   private ClassLoader prevClassLoader = null;
+
+  OrcUtil orcUtil = OrcUtil.getInstance();
 
   public ImportTool() {
     this("import", false);
@@ -499,8 +503,9 @@ public class ImportTool extends BaseSqoopTool {
    * Import a table or query.
    * @return true if an import was performed, false otherwise.
    */
-  protected boolean importTable(SqoopOptions options, String tableName,
+  protected boolean importTable(SqoopOptions options,
       HiveImport hiveImport) throws IOException, ImportException {
+    String tableName = options.getTableName();
     String jarFile = null;
 
     // Generate the ORM code for the tables.
@@ -520,6 +525,10 @@ public class ImportTool extends BaseSqoopTool {
 
     if (options.isDeleteMode()) {
       deleteTargetDir(context);
+    }
+
+    if (SqoopOptions.FileLayout.OrcFile.equals(options.getFileLayout())) {
+      orcUtil.setOrcSchemaInConf(options, manager);
     }
 
     if (null != tableName) {
@@ -631,7 +640,7 @@ public class ImportTool extends BaseSqoopTool {
       }
 
       // Import a single table (or query) the user specified.
-      importTable(options, options.getTableName(), hiveImport);
+      importTable(options, hiveImport);
     } catch (IllegalArgumentException iea) {
         LOG.error(IMPORT_FAILED_ERROR_MSG + iea.getMessage());
       rethrowIfRequired(options, iea);
@@ -747,6 +756,10 @@ public class ImportTool extends BaseSqoopTool {
     importOpts.addOption(OptionBuilder
         .withDescription("Imports data to Parquet files")
         .withLongOpt(BaseSqoopTool.FMT_PARQUETFILE_ARG)
+        .create());
+    importOpts.addOption(OptionBuilder
+        .withDescription("Imports data to ORC files")
+        .withLongOpt(BaseSqoopTool.FMT_ORCFILE_ARG)
         .create());
     importOpts.addOption(OptionBuilder.withArgName("n")
         .hasArg().withDescription("Use 'n' map tasks to import in parallel")
@@ -972,6 +985,10 @@ public class ImportTool extends BaseSqoopTool {
 
       if (in.hasOption(FMT_PARQUETFILE_ARG)) {
         out.setFileLayout(SqoopOptions.FileLayout.ParquetFile);
+      }
+
+      if (in.hasOption(FMT_ORCFILE_ARG)) {
+        out.setFileLayout(SqoopOptions.FileLayout.OrcFile);
       }
 
       if (in.hasOption(NUM_MAPPERS_ARG)) {

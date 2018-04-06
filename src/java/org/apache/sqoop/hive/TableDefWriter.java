@@ -214,19 +214,23 @@ public class TableDefWriter {
         .append(" STRING) ");
      }
 
-    sb.append("ROW FORMAT DELIMITED FIELDS TERMINATED BY '");
-    sb.append(getHiveOctalCharCode((int) options.getOutputFieldDelim()));
-    sb.append("' LINES TERMINATED BY '");
-    sb.append(getHiveOctalCharCode((int) options.getOutputRecordDelim()));
-    String codec = options.getCompressionCodec();
-    if (codec != null && (codec.equals(CodecMap.LZOP)
-            || codec.equals(CodecMap.getCodecClassName(CodecMap.LZOP)))) {
-      sb.append("' STORED AS INPUTFORMAT "
-              + "'com.hadoop.mapred.DeprecatedLzoTextInputFormat'");
-      sb.append(" OUTPUTFORMAT "
-              + "'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'");
+    if (SqoopOptions.FileLayout.OrcFile.equals(options.getFileLayout())) {
+      sb.append("STORED AS ORC");
     } else {
-      sb.append("' STORED AS TEXTFILE");
+      sb.append("ROW FORMAT DELIMITED FIELDS TERMINATED BY '");
+      sb.append(getHiveOctalCharCode((int) options.getOutputFieldDelim()));
+      sb.append("' LINES TERMINATED BY '");
+      sb.append(getHiveOctalCharCode((int) options.getOutputRecordDelim()));
+      String codec = options.getCompressionCodec();
+      if (codec != null && (codec.equals(CodecMap.LZOP)
+          || codec.equals(CodecMap.getCodecClassName(CodecMap.LZOP)))) {
+        sb.append("' STORED AS INPUTFORMAT "
+            + "'com.hadoop.mapred.DeprecatedLzoTextInputFormat'");
+        sb.append(" OUTPUTFORMAT "
+            + "'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'");
+      } else {
+        sb.append("' STORED AS TEXTFILE");
+      }
     }
 
     if (isHiveExternalTableSet) {

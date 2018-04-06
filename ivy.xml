@@ -140,6 +140,17 @@ under the License.
                 conf="common->default">
     </dependency>
 
+    <!-- Orc -->
+    <dependency org="org.apache.orc" name="orc-mapreduce" rev="${orc.version}"
+                conf="common->default;redist->default">
+      <exclude org="org.slf4j" module="slf4j-api"/>
+      <exclude org="com.google.protobuf" module="protobuf-java"/>
+      <exclude org="org.apache.hadoop" module="hadoop-common"/>
+      <exclude org="org.apache.hadoop" module="hadoop-mapreduce-client-core"/>
+      <exclude org="com.google.guava" module="guava"/>
+      <exclude org="com.esotericsoftware" module="kryo-shaded"/>
+    </dependency>
+
     <!-- HBase 0.95 -->
     <dependency org="org.apache.hbase" name="hbase-client" rev="${hbase.version}" conf="common->default">
       <artifact name="hbase-client" type="jar"/>

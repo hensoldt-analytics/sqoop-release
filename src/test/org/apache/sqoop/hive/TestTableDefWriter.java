@@ -316,4 +316,26 @@ public class TestTableDefWriter {
     assertTrue(computeStatsStmt.length() > 0);
     assertTrue(computeStatsStmt.matches("ANALYZE TABLE `db`.`outputTable`.*COMPUTE STATISTICS"));
   }
+
+  /**
+   * If --as-orcfile is specified. Sqoop should create Hive table
+   * as ORC.
+   * @throws Exception
+   */
+  @Test
+  public void testOrcFormatInCreateStatement() throws Exception {
+    String[] args = { "--as-orcfile" };
+    Configuration conf = new Configuration();
+    SqoopOptions options =
+        new ImportTool().parseArguments(args, null, null, false);
+    TableDefWriter writer = new TableDefWriter(options,
+        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
+
+    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
+    writer.setColumnTypes(colTypes);
+
+    String createTable = writer.getCreateTableStmt();
+    assertNotNull(createTable);
+    assertTrue(createTable.contains("STORED AS ORC"));
+  }
 }

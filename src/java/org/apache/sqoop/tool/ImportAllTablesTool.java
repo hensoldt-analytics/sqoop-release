@@ -102,7 +102,8 @@ public class ImportAllTablesTool extends ImportTool {
             System.out.println("Skipping table: " + tableName);
           } else {
             SqoopOptions clonedOptions = (SqoopOptions) options.clone();
-            importTable(clonedOptions, tableName, hiveImport);
+            clonedOptions.setTableName(tableName);
+            importTable(clonedOptions, hiveImport);
           }
         }
       }
