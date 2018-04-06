@@ -106,6 +106,7 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
   public static final String FMT_TEXTFILE_ARG = "as-textfile";
   public static final String FMT_AVRODATAFILE_ARG = "as-avrodatafile";
   public static final String FMT_PARQUETFILE_ARG = "as-parquetfile";
+  public static final String FMT_ORCFILE_ARG = "as-orcfile";
   public static final String HIVE_IMPORT_ARG = "hive-import";
   public static final String HIVE_TABLE_ARG = "hive-table";
   public static final String HIVE_DATABASE_ARG = "hive-database";
@@ -1566,7 +1567,7 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
         && options.isAppendMode()
         && !options.getIncrementalMode().equals(IncrementalMode.AppendRows)) {
       throw new InvalidOptionsException("Append mode for hive imports is not "
-          + " yet supported. Please remove the parameter --append-mode");
+          + "yet supported. Please remove the parameter --append-mode");
     }
 
     // Many users are reporting issues when they are trying to import data

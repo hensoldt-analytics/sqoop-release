@@ -49,6 +49,7 @@ public class ExportTool extends BaseSqoopTool {
   private final List<String> unsupportedArguments =
     Collections.unmodifiableList(
       Arrays.asList(
+        BaseSqoopTool.FMT_ORCFILE_ARG,
         BaseSqoopTool.FMT_PARQUETFILE_ARG,
         BaseSqoopTool.FMT_AVRODATAFILE_ARG,
         BaseSqoopTool.FMT_SEQUENCEFILE_ARG)
