@@ -37,6 +37,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.TimeZone;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -209,22 +210,29 @@ public class TestOrcImport extends ImportJobTestCase {
    */
   @Test
   public void testDatetimeTypeOverrides() throws Exception {
-    String[] names = {"dt", "ts"};
-    String[] types = {"DATE", "TIMESTAMP"};
-    String[] vals = {"'2018-04-08'", "'2018-04-08 10:00:00'"};
-    createTableWithColTypesAndNames(names, types, vals);
+    TimeZone originalTZ = TimeZone.getDefault();
+    try {
+      TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 
-    runImport(getOutputArgv(true, new String[] {"--map-column-hive", "TS=TIMESTAMP,DT=DATE"}));
+      String[] names = {"dt", "ts"};
+      String[] types = {"DATE", "TIMESTAMP"};
+      String[] vals = {"'2018-04-08'", "'2018-04-08 10:00:00'"};
+      createTableWithColTypesAndNames(names, types, vals);
+
+      runImport(getOutputArgv(true, new String[]{"--map-column-hive", "TS=TIMESTAMP,DT=DATE"}));
 
 
-    Reader reader = getResults();
-    RecordReader rows = reader.rows();
-    VectorizedRowBatch batch = reader.getSchema().createRowBatch();
-    rows.nextBatch(batch);
-    assertEquals(1, batch.size);
-    assertEquals(17629, ((LongColumnVector) batch.cols[0]).vector[0]);
-    assertEquals(1523174400000l, ((TimestampColumnVector) batch.cols[1]).time[0]);
-    assertEquals(0, ((TimestampColumnVector) batch.cols[1]).nanos[0]);
+      Reader reader = getResults();
+      RecordReader rows = reader.rows();
+      VectorizedRowBatch batch = reader.getSchema().createRowBatch();
+      rows.nextBatch(batch);
+      assertEquals(1, batch.size);
+      assertEquals(17629, ((LongColumnVector) batch.cols[0]).vector[0]);
+      assertEquals(1523181600000l, ((TimestampColumnVector) batch.cols[1]).time[0]);
+      assertEquals(0, ((TimestampColumnVector) batch.cols[1]).nanos[0]);
+    } finally {
+      TimeZone.setDefault(originalTZ);
+    }
   }
 
   @Test
