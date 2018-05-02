@@ -503,8 +503,9 @@ public class ImportTool extends BaseSqoopTool {
    * Import a table or query.
    * @return true if an import was performed, false otherwise.
    */
-  protected boolean importTable(SqoopOptions options, String tableName,
+  protected boolean importTable(SqoopOptions options,
       HiveImport hiveImport) throws IOException, ImportException {
+    String tableName = options.getTableName();
     String jarFile = null;
 
     // Generate the ORM code for the tables.
@@ -524,6 +525,10 @@ public class ImportTool extends BaseSqoopTool {
 
     if (options.isDeleteMode()) {
       deleteTargetDir(context);
+    }
+
+    if (SqoopOptions.FileLayout.OrcFile.equals(options.getFileLayout())) {
+      orcUtil.setOrcSchemaInConf(options, manager);
     }
 
     if (null != tableName) {
@@ -630,16 +635,12 @@ public class ImportTool extends BaseSqoopTool {
     codeGenerator.setManager(manager);
 
     try {
-      if (SqoopOptions.FileLayout.OrcFile.equals(options.getFileLayout())) {
-        orcUtil.setOrcSchemaInConf(options, manager);
-      }
-
       if (options.doHiveImport()) {
         hiveImport = new HiveImport(options, manager, options.getConf(), false);
       }
 
       // Import a single table (or query) the user specified.
-      importTable(options, options.getTableName(), hiveImport);
+      importTable(options, hiveImport);
     } catch (IllegalArgumentException iea) {
         LOG.error(IMPORT_FAILED_ERROR_MSG + iea.getMessage());
       rethrowIfRequired(options, iea);
