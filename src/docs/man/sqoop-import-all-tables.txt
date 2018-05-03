@@ -39,6 +39,9 @@ Import control options
 --as-parquetfile::
   Imports data to Parquet Files
 
+--as-orcfile::
+  Imports data to ORC Files
+
 --direct::
   Use direct import fast path (mysql only)
 

@@ -32,6 +32,9 @@ Import control options
 --as-parquetfile::
   Imports data to Parquet Files
 
+--as-orcfile::
+  Imports data to ORC Files
+
 --num-mappers (n)::
 -m::
   Use 'n' map tasks to import in parallel
