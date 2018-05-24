@@ -45,13 +45,11 @@ public class TestSqoopJobDataPublisher extends ImportJobTestCase {
     @Before
     public void setUp() {
         super.setUp();
-        HiveImport.setTestMode(true);
     }
 
     @After
     public void tearDown() {
         super.tearDown();
-        HiveImport.setTestMode(false);
     }
     /**
      * Create the argv to pass to Sqoop.
