@@ -128,7 +128,9 @@ under the License.
       <exclude org="org.apache.avro" module="avro" />
     </dependency>
     <dependency org="org.apache.parquet" name="parquet-avro" rev="${parquet.version}"
-      conf="common->default;redist->default" />
+                conf="common->default;redist->default" />
+    <dependency org="org.apache.parquet" name="parquet-hadoop-bundle" rev="${parquet.version}"
+                conf="common->default;redist->default" />
 
     <dependency org="com.fasterxml.jackson.core" name="jackson-databind" rev="${jackson-databind.version}"
           conf="common->default;redist->default" />
