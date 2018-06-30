@@ -58,10 +58,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
-import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -70,6 +68,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.hadoop.hive.common.type.Timestamp;
+import org.apache.hadoop.hive.common.type.Date;
 
 /**
  * Helper class for Sqoop HCat Integration import jobs.
@@ -326,20 +327,28 @@ public class SqoopHCatImportHelper {
     return null;
   }
 
+  private Date sqlToHiveDate(java.util.Date dt) {
+    return Date.ofEpochMilli(dt.getTime());
+  }
+
+  private Timestamp sqlToHiveTimestamp(java.util.Date t) {
+    return Timestamp.ofEpochMilli(t.getTime());
+  }
+
   private Object converDateToPrimitiveTypes(Object val, PrimitiveTypeInfo typeInfo) {
     PrimitiveObjectInspector.PrimitiveCategory category = typeInfo.getPrimitiveCategory();
     Date d;
     Time t;
     Timestamp ts;
     if (val instanceof java.sql.Date) {
-      d = (Date) val;
+      d = sqlToHiveDate((java.sql.Date)val);
       switch(category) {
         case DATE:
           return d;
         case TIMESTAMP:
-          return new Timestamp(d.getTime());
+          return sqlToHiveTimestamp((java.sql.Date)val);
         case LONG:
-          return (d.getTime());
+          return (d.toEpochMilli());
         case STRING:
           return val.toString();
         case VARCHAR:
@@ -355,9 +364,9 @@ public class SqoopHCatImportHelper {
       t = (Time) val;
       switch(category) {
         case DATE:
-          return new Date(t.getTime());
+          return sqlToHiveDate(t);
         case TIMESTAMP:
-          return new Timestamp(t.getTime());
+          return sqlToHiveTimestamp(t);
         case LONG:
           return ((Time) val).getTime();
         case STRING:
@@ -372,14 +381,14 @@ public class SqoopHCatImportHelper {
           return hChar;
       }
     } else if (val instanceof java.sql.Timestamp) {
-      ts = (Timestamp) val;
+      ts = sqlToHiveTimestamp((java.sql.Timestamp)val);
       switch(category) {
         case DATE:
-          return new Date(ts.getTime());
+          return sqlToHiveDate((java.sql.Timestamp)val);
         case TIMESTAMP:
           return ts;
         case LONG:
-          return ts.getTime();
+          return ts.toEpochMilli();
         case STRING:
           return val.toString();
         case VARCHAR:
@@ -445,7 +454,7 @@ public class SqoopHCatImportHelper {
         Date dt = null;
         if (m.matches()) {
           Long l1 = Long.valueOf(str);
-          dt = new Date(l1);
+          dt = Date.ofEpochMilli(l1);
         } else {
           // treat it as date string
           dt = Date.valueOf(str);
@@ -456,7 +465,7 @@ public class SqoopHCatImportHelper {
         Timestamp ts = null;
         if (m2.matches()) {
           Long l2 = Long.valueOf(str);
-          ts = new Timestamp(l2);
+          ts = Timestamp.ofEpochMilli(l2);
         } else {
           // treat it as date string
           ts = Timestamp.valueOf(str);
