@@ -20,6 +20,7 @@ package org.apache.sqoop.mapreduce;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -100,7 +101,7 @@ public final class ParquetJob {
    * {@link org.apache.avro.generic.GenericRecord}.
    */
   public static void configureImportJob(JobConf conf, Schema schema,
-      String uri, WriteMode writeMode) throws IOException {
+      String uri, WriteMode writeMode, String externalHiveDir) throws IOException {
     Dataset dataset;
 
     // Add hive delegation token only if we don't already have one.
@@ -128,7 +129,7 @@ public final class ParquetJob {
         throw new AvroSchemaMismatchException(exceptionMessage, writtenWith, schema);
       }
     } else {
-      dataset = createDataset(schema, getCompressionType(conf), uri);
+      dataset = createDataset(schema, getCompressionType(conf), uri, externalHiveDir);
     }
     conf.set(CONF_AVRO_SCHEMA, schema.toString());
 
@@ -148,12 +149,15 @@ public final class ParquetJob {
   }
 
   public static Dataset createDataset(Schema schema,
-      CompressionType compressionType, String uri) {
-    DatasetDescriptor descriptor = new DatasetDescriptor.Builder()
+      CompressionType compressionType, String uri, String externalHiveDir) {
+    DatasetDescriptor.Builder builder = new DatasetDescriptor.Builder()
         .schema(schema)
         .format(Formats.PARQUET)
-        .compressionType(compressionType)
-        .build();
+        .compressionType(compressionType);
+    if ( !StringUtils.isBlank(externalHiveDir)) {
+      builder.location(externalHiveDir);
+    }
+    DatasetDescriptor descriptor = builder.build();
     return Datasets.create(uri, descriptor, GenericRecord.class);
   }
 
