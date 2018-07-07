@@ -128,7 +128,7 @@ public class DataDrivenImportJob extends ImportJobBase {
         // choose DEFAULT as write mode.
         writeMode = ParquetJob.WriteMode.DEFAULT;
       }
-      ParquetJob.configureImportJob(conf, schema, uri, writeMode);
+      ParquetJob.configureImportJob(conf, schema, uri, writeMode, options.getHiveExternalTableDir());
     }
 
     job.setMapperClass(getMapperClass());
