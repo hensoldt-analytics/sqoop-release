@@ -49,6 +49,7 @@ import com.cloudera.sqoop.lib.RecordParser;
 import com.cloudera.sqoop.lib.BlobRef;
 import com.cloudera.sqoop.lib.ClobRef;
 import com.cloudera.sqoop.lib.SqoopRecord;
+import org.apache.sqoop.util.DirCleanupHook;
 
 /**
  * Creates an ORM class to represent a table from a database.
@@ -1764,6 +1765,12 @@ public class ClassWriter {
       String colTypeStr = sbColTypes.toString();
       LOG.debug("Columns: " + colTypeStr);
       LOG.debug("sourceFilename is " + sourceFilename);
+    }
+
+    // SQOOP-3042 - Sqoop does not clear compile directory under /tmp/sqoop-<username>/compile
+    // Add shutdown hook so that all files under the jar output dir can be cleared
+    if(options.getDeleteJarOutputDir()) {
+      Runtime.getRuntime().addShutdownHook(new DirCleanupHook(options.getJarOutputDir()));
     }
 
     compileManager.addSourceFile(sourceFilename);

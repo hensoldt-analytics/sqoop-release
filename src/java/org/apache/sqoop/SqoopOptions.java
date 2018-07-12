@@ -142,6 +142,7 @@ public class SqoopOptions implements Cloneable {
 
   @StoredAsProperty("codegen.output.dir") private String codeOutputDir;
   @StoredAsProperty("codegen.compile.dir") private String jarOutputDir;
+  @StoredAsProperty("codegen.delete.compile.dir") private boolean deleteJarOutputDir;
   // Boolean specifying whether jarOutputDir is a nonce tmpdir (true), or
   // explicitly set by the user (false). If the former, disregard any value
   // for jarOutputDir saved in the metastore.
@@ -983,6 +984,8 @@ public class SqoopOptions implements Cloneable {
     this.jarOutputDir = getNonceJarDir(tmpDir + "sqoop-" + localUsername
         + "/compile");
     this.jarDirIsAuto = true;
+    // Default to false, so behaviour does not change
+    this.deleteJarOutputDir = false;
     this.layout = FileLayout.TextFile;
 
     this.areOutputDelimsManuallySet = false;
@@ -1571,6 +1574,17 @@ public class SqoopOptions implements Cloneable {
   public void setJarOutputDir(String outDir) {
     this.jarOutputDir = outDir;
     this.jarDirIsAuto = false;
+  }
+
+  /**
+   * @return boolean - whether or not to delete the compile JAR directory
+   */
+  public Boolean getDeleteJarOutputDir() {
+    return this.deleteJarOutputDir;
+  }
+
+  public void setDeleteJarOutputDir(Boolean delete) {
+    this.deleteJarOutputDir = delete;
   }
 
   /**
