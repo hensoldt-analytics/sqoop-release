@@ -95,6 +95,7 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
   public static final String TARGET_DIR_ARG = "target-dir";
   public static final String APPEND_ARG = "append";
   public static final String DELETE_ARG = "delete-target-dir";
+  public static final String DELETE_COMPILE_ARG = "delete-compile-dir";
   public static final String NULL_STRING = "null-string";
   public static final String INPUT_NULL_STRING = "input-null-string";
   public static final String NULL_NON_STRING = "null-non-string";
@@ -785,6 +786,10 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
         .withDescription("Output directory for compiled objects")
         .withLongOpt(BIN_OUT_DIR_ARG)
         .create());
+    codeGenOpts.addOption(OptionBuilder
+        .withDescription("Delete compile directory")
+        .withLongOpt(DELETE_COMPILE_ARG)
+        .create());
     codeGenOpts.addOption(OptionBuilder.withArgName("name")
         .hasArg()
         .withDescription("Put auto-generated classes in this package")
@@ -1394,6 +1399,10 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
 
     if (in.hasOption(BIN_OUT_DIR_ARG)) {
       out.setJarOutputDir(in.getOptionValue(BIN_OUT_DIR_ARG));
+    }
+
+    if (in.hasOption(DELETE_COMPILE_ARG)) {
+      out.setDeleteJarOutputDir(true);
     }
 
     if (in.hasOption(PACKAGE_NAME_ARG)) {
