@@ -36,11 +36,10 @@ public final class PublishJobData {
 
     private PublishJobData() {}
 
-    public static void publishJobData(Configuration conf, SqoopOptions options,
+    public static void publishJobData(String publishClassName, SqoopOptions options,
                                       String operation, String tableName, long startTime) {
         // Publish metadata about export job to listeners (if they are registered with sqoop)
         long endTime = new Date().getTime();
-        String publishClassName = conf.get(ConfigurationConstants.DATA_PUBLISH_CLASS);
         if (!StringUtils.isEmpty(publishClassName)) {
             try {
                 Class publishClass =  Class.forName(publishClassName);

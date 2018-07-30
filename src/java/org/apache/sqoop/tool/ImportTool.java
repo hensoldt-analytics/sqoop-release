@@ -25,6 +25,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -42,10 +43,13 @@ import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.SqoopOptions.InvalidOptionsException;
 import org.apache.sqoop.cli.RelatedOptions;
 import org.apache.sqoop.cli.ToolOptions;
+import org.apache.sqoop.config.ConfigurationConstants;
 import org.apache.sqoop.hive.HiveImport;
 import org.apache.sqoop.manager.ConnManager;
 import org.apache.sqoop.manager.ImportJobContext;
+import org.apache.sqoop.mapreduce.ImportJobBase;
 import org.apache.sqoop.mapreduce.MergeJob;
+import org.apache.sqoop.mapreduce.PublishJobData;
 import org.apache.sqoop.metastore.JobData;
 import org.apache.sqoop.metastore.JobStorage;
 import org.apache.sqoop.metastore.JobStorageFactory;
@@ -531,6 +535,8 @@ public class ImportTool extends BaseSqoopTool {
       orcUtil.setOrcSchemaInConf(options, manager);
     }
 
+    long startTime = new Date().getTime();
+
     if (null != tableName) {
       manager.importTable(context);
     } else {
@@ -551,6 +557,13 @@ public class ImportTool extends BaseSqoopTool {
       if (options.getFileLayout() != SqoopOptions.FileLayout.ParquetFile) {
         hiveImport.importTable(tableName, options.getHiveTableName(), false);
       }
+    }
+
+    if (options.doHiveImport() || options.getHCatTableName() != null) {
+      // Publish data for import job, only hive/hcat import jobs are supported now.
+      LOG.info("Publishing Hive/Hcat import job data to Listeners for table " + tableName);
+      String publishClass = options.getConf().get(ConfigurationConstants.DATA_PUBLISH_CLASS);
+      PublishJobData.publishJobData(publishClass, options, ImportJobBase.OPERATION, tableName, startTime);
     }
 
     saveIncrementalState(options);

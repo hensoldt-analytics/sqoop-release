@@ -63,6 +63,13 @@ public abstract class BaseSqoopTestCase {
       storeType = data.getStoreType();
       operation = data.getOperation();
     }
+
+    public static void reset() {
+      hiveTable = null;
+      storeTable = null;
+      storeType = null;
+      operation = null;
+    }
   }
 
   public static final Log LOG = LogFactory.getLog(
