@@ -229,23 +229,23 @@ public class SqoopHCatExportHelper {
         }
         break;
       case DATE:
-        Date date = (Date) val;
+        org.apache.hadoop.hive.common.type.Date date = (org.apache.hadoop.hive.common.type.Date) val;
         if (javaColType.equals(DATE_TYPE)) {
-          return date;
+          return new Date(date.toEpochMilli());
         } else if (javaColType.equals(TIME_TYPE)) {
-          return new Time(date.getTime());
+          return new Time(date.toEpochMilli());
         } else if (javaColType.equals(TIMESTAMP_TYPE)) {
-          return new Timestamp(date.getTime());
+          return new Timestamp(date.toEpochMilli());
         }
         break;
       case TIMESTAMP:
-        Timestamp ts = (Timestamp) val;
+        org.apache.hadoop.hive.common.type.Timestamp ts = (org.apache.hadoop.hive.common.type.Timestamp) val;
         if (javaColType.equals(DATE_TYPE)) {
-          return new Date(ts.getTime());
+          return new Date(ts.toEpochMilli());
         } else if (javaColType.equals(TIME_TYPE)) {
-          return new Time(ts.getTime());
+          return new Time(ts.toEpochMilli());
         } else if (javaColType.equals(TIMESTAMP_TYPE)) {
-          return ts;
+          return new Timestamp(ts.toEpochMilli());
         }
         break;
       case STRING:
