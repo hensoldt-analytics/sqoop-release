@@ -166,6 +166,7 @@ under the License.
       <exclude org="org.apache.hadoop" module="hadoop-mapreduce-client-core"/>
       <exclude org="com.google.guava" module="guava"/>
       <exclude org="com.esotericsoftware" module="kryo-shaded"/>
+      <exclude org="org.apache.hadoop" module="hadoop-hdfs" />
     </dependency>
 
     <!-- HBase 0.95 -->
