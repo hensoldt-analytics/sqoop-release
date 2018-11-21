@@ -518,11 +518,11 @@
     </copy>
 
     <!-- copy the test artifact -->
-    <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
+    <!--copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
       <fileset dir="${build.dir}">
         <include name="${test.jar}" />
       </fileset>
-    </copy>
+    </copy-->
 
     <!-- copy in various components of the initial source layout
          so that the redistributable can bootstrap itself. -->
@@ -1026,7 +1026,8 @@
     <echo message="Release audit report: ${build.dir}/rat.log" />
   </target>
 
-  <target name="mvn-prep" depends="init,ivy-resolve-test">
+  <target name="mvn-prep" depends="init,ivy-resolve-test" unless="mvn-prep.initialized">
+    <property name="mvn-prep.initialized" value="true" />
     <!-- prepare for mvn tasks. -->
 
     <!-- Download maven -->

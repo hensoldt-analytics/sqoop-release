@@ -25,6 +25,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -45,10 +46,15 @@ import org.apache.sqoop.cli.ToolOptions;
 import org.apache.sqoop.config.ConfigurationHelper;
 import org.apache.sqoop.hive.HiveClient;
 import org.apache.sqoop.hive.HiveClientFactory;
+import org.apache.sqoop.config.ConfigurationConstants;
+import org.apache.sqoop.hive.HiveImport;
+import org.apache.sqoop.manager.ConnManager;
 import org.apache.sqoop.manager.ImportJobContext;
+import org.apache.sqoop.mapreduce.ImportJobBase;
 import org.apache.sqoop.mapreduce.MergeJob;
 import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorFactory;
 import org.apache.sqoop.mapreduce.parquet.ParquetMergeJobConfigurator;
+import org.apache.sqoop.mapreduce.PublishJobData;
 import org.apache.sqoop.metastore.JobData;
 import org.apache.sqoop.metastore.JobStorage;
 import org.apache.sqoop.metastore.JobStorageFactory;
@@ -57,6 +63,7 @@ import org.apache.sqoop.orm.TableClassName;
 import org.apache.sqoop.util.AppendUtils;
 import org.apache.sqoop.util.ClassLoaderStack;
 import org.apache.sqoop.util.ImportException;
+import org.apache.sqoop.util.OrcUtil;
 
 import static org.apache.sqoop.manager.SupportedManagers.MYSQL;
 import static org.apache.commons.lang3.StringUtils.startsWith;
@@ -86,6 +93,8 @@ public class ImportTool extends BaseSqoopTool {
   private final HiveClientFactory hiveClientFactory;
 
   private final String S3_URI_SCHEME = "s3a://";
+
+  OrcUtil orcUtil = OrcUtil.getInstance();
 
   public ImportTool() {
     this("import", false);
@@ -530,6 +539,12 @@ public class ImportTool extends BaseSqoopTool {
       deleteTargetDir(context);
     }
 
+    if (SqoopOptions.FileLayout.OrcFile.equals(options.getFileLayout())) {
+      orcUtil.setOrcSchemaInConf(options, manager);
+    }
+
+    long startTime = new Date().getTime();
+
     if (null != options.getTableName()) {
       manager.importTable(context);
     } else {
@@ -547,6 +562,13 @@ public class ImportTool extends BaseSqoopTool {
     if (isHiveImportNeeded(options)) {
       HiveClient hiveClient = hiveClientFactory.createHiveClient(options, manager);
       hiveClient.importTable();
+    }
+
+    if (isHiveImportNeeded(options) || options.getHCatTableName() != null) {
+      // Publish data for import job, only hive/hcat import jobs are supported now.
+      LOG.info("Publishing Hive/Hcat import job data to Listeners for table " + options.getTableName());
+      String publishClass = options.getConf().get(ConfigurationConstants.DATA_PUBLISH_CLASS);
+      PublishJobData.publishJobData(publishClass, options, ImportJobBase.OPERATION, options.getTableName(), startTime);
     }
 
     saveIncrementalState(options);
@@ -746,6 +768,10 @@ public class ImportTool extends BaseSqoopTool {
     importOpts.addOption(OptionBuilder
         .withDescription("Imports data to Parquet files")
         .withLongOpt(BaseSqoopTool.FMT_PARQUETFILE_ARG)
+        .create());
+    importOpts.addOption(OptionBuilder
+        .withDescription("Imports data to ORC files")
+        .withLongOpt(BaseSqoopTool.FMT_ORCFILE_ARG)
         .create());
     importOpts.addOption(OptionBuilder
       .withDescription("Imports data to Binary files")
@@ -975,6 +1001,10 @@ public class ImportTool extends BaseSqoopTool {
 
       if (in.hasOption(FMT_PARQUETFILE_ARG)) {
         out.setFileLayout(SqoopOptions.FileLayout.ParquetFile);
+      }
+
+      if (in.hasOption(FMT_ORCFILE_ARG)) {
+        out.setFileLayout(SqoopOptions.FileLayout.OrcFile);
       }
 
       if (in.hasOption(NUM_MAPPERS_ARG)) {

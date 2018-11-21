@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.HadoopShims.HCatHadoopShims;
 import org.apache.hadoop.hive.shims.ShimLoader;
@@ -136,7 +137,7 @@ public final class SqoopHCatUtilities {
   // DB stuff
   private String[] dbColumnNames;
   private String dbTableName;
-  private LCKeyMap<List<Integer>> dbColumnInfo;
+  private HashMap<String, List<Integer>> dbColumnInfo;
 
   private int[] hCatFieldPositions; // For each DB column, HCat position
 
@@ -431,10 +432,11 @@ public final class SqoopHCatUtilities {
 
     List<HCatFieldSchema> outputFieldList = new ArrayList<HCatFieldSchema>();
     for (String col : dbColumnNames) {
+      String lcCol = col.toLowerCase();
       try {
-        HCatFieldSchema hfs = hCatFullTableSchema.get(col);
+        HCatFieldSchema hfs = hCatFullTableSchema.get(lcCol);
         if (hfs == null) {
-          throw new IOException("Database column " + col + " not found in "
+          throw new IOException("HCatalog column " + lcCol + " for database column " + col + " not found in "
               + " hcatalog table.");
         }
       } catch (Exception e) {
@@ -453,7 +455,7 @@ public final class SqoopHCatUtilities {
       if (skip) {
         continue;
       }
-      outputFieldList.add(hCatFullTableSchema.get(col));
+      outputFieldList.add(hCatFullTableSchema.get(lcCol));
     }
 
     projectedSchema = new HCatSchema(outputFieldList);
@@ -481,7 +483,7 @@ public final class SqoopHCatUtilities {
     for (String s : hCatDynamicPartitionKeys) {
       boolean found = false;
       for (String c : dbColumnNames) {
-        if (s.equals(c)) {
+        if (s.equals(c.toLowerCase())) {
           found = true;
           break;
         }
@@ -499,21 +501,39 @@ public final class SqoopHCatUtilities {
 
   public void validateHCatTableFieldTypes() throws IOException {
     StringBuilder sb = new StringBuilder();
-    boolean hasComplexFields = false;
     for (HCatFieldSchema hfs : projectedSchema.getFields()) {
+      // Validate complex fields
+      // For array we will support arrays of primitive types
+      // For maps, the keytype should be simple type
+      // For structs, we want all the subscheme types to be primitive types
       if (hfs.isComplex()) {
-        sb.append('.').append(hfs.getName());
-        hasComplexFields = true;
+        HCatFieldSchema.Type fieldType = hfs.getType();
+        if (fieldType == HCatFieldSchema.Type.ARRAY) {
+          HCatSchema arraySchema = hfs.getArrayElementSchema();
+          if (arraySchema.get(0).isComplex()) {
+            sb.append("Field " + hfs.getName() + " is an array of complex types.  ");
+            sb.append("Type mapping of complex types are stricter than primitive types");
+          }
+        } else if (fieldType == HCatFieldSchema.Type.MAP) {
+          HCatSchema valueSchema = hfs.getMapValueSchema();
+
+          if (valueSchema.get(0).isComplex()) {
+            sb.append("Field " + hfs.getName() + " is a map of complex value type.  ");
+            sb.append("Type mapping of complex types are stricter than primitive types");
+          }
+        } else if (fieldType == HCatFieldSchema.Type.STRUCT) {
+          HCatSchema structSchema = hfs.getStructSubSchema();
+          for (HCatFieldSchema structFieldSchema : structSchema.getFields()) {
+            if (structFieldSchema.isComplex()) {
+              sb.append("Field " + hfs.getName() + " is a struct with members of complex type.  ");
+              sb.append("Type mapping of complex types are stricter than primitive types");
+            }
+          }
+        } else {
+          throw new IOException("Unsupport complex type : " + fieldType.toString());
+        }
       }
     }
-
-    if (hasComplexFields) {
-      String unsupportedFields = sb.substring(1);
-      throw new IOException("The HCatalog table provided "
-        + getQualifiedHCatTableName() + " has complex field types ("
-        + unsupportedFields + ").  They are currently not supported");
-    }
-
   }
 
   /**
@@ -550,10 +570,10 @@ public final class SqoopHCatUtilities {
     dbColumnNames = new String[colNames.length];
 
     for (int i = 0; i < colNames.length; ++i) {
-      dbColumnNames[i] = colNames[i].toLowerCase();
+      dbColumnNames[i] = colNames[i];
     }
 
-    LCKeyMap<List<Integer>> colInfo = new LCKeyMap<List<Integer>>();
+    HashMap<String, List<Integer>> colInfo = new HashMap<String, List<Integer>>();
     if (dbTableName != null) {
         colInfo.putAll(connManager.getColumnInfo(dbTableName));
     } else if (options.getCall() != null) {
@@ -568,7 +588,7 @@ public final class SqoopHCatUtilities {
     if (options.getColumns() == null) {
       dbColumnInfo = colInfo;
     } else {
-      dbColumnInfo = new LCKeyMap<List<Integer>>();
+      dbColumnInfo = new HashMap<String, List<Integer>>();
       // prune column types based on projection
       for (String col : dbColumnNames) {
         List<Integer> info = colInfo.get(col);
@@ -611,7 +631,8 @@ public final class SqoopHCatUtilities {
     sb.append(escHCatObj(hCatTableName)).append(" (\n\t");
     boolean first = true;
     for (String col : dbColumnNames) {
-      String type = userHiveMapping.get(col);
+      String lcCol = col.toLowerCase();
+      String type = userHiveMapping.get(lcCol);
       int prec = -1;
       int scale = -1;
       if (type == null) {
@@ -619,9 +640,13 @@ public final class SqoopHCatUtilities {
       }
       if (type.equals("char") || type.equals("varchar")) {
         prec = dbColumnInfo.get(col).get(1);
-        if (prec > MAX_HIVE_CHAR_PREC) {
-          LOG.warn("Truncating precison of column " + col + "  from " + prec
-            + " to " + MAX_HIVE_CHAR_PREC);
+        if (prec > MAX_HIVE_CHAR_PREC || prec <= 0) {
+          if (prec <= 0) {
+            LOG.warn("Setting precison of column " + col + " to "
+                    + MAX_HIVE_CHAR_PREC + " as DB has no precision information");
+          } else {
+            LOG.warn("Truncating precison of column " + col + "  from " + prec + " to " + MAX_HIVE_CHAR_PREC);
+          }
           prec = MAX_HIVE_CHAR_PREC;
         }
       } else if (type.equals("decimal")) {
@@ -642,7 +667,7 @@ public final class SqoopHCatUtilities {
       boolean skip=false;
       if (hCatStaticPartitionKeys != null) {
         for (String key : hCatStaticPartitionKeys) {
-          if (col.equals(key)) {
+          if (lcCol.equals(key)) {
             skip=true;
             break;
           }
@@ -656,7 +681,7 @@ public final class SqoopHCatUtilities {
       } else {
         sb.append(",\n\t");
       }
-      sb.append(escHCatObj(col)).append(' ').append(type);
+      sb.append(escHCatObj(lcCol)).append(' ').append(type);
       if (prec > 0) {
         sb.append('(').append(prec);
         if (scale > 0) {
@@ -718,8 +743,9 @@ public final class SqoopHCatUtilities {
     for (int indx = 0; indx < dbColumnNames.length; ++indx) {
       boolean userMapped = false;
       String col = dbColumnNames[indx];
+      String lcCol = col.toLowerCase();
       List<Integer> colInfo = dbColumnInfo.get(col);
-      String hCatColType = userHiveMapping.get(col);
+      String hCatColType = userHiveMapping.get(lcCol);
       if (hCatColType == null) {
         LOG.debug("No user defined type mapping for HCatalog field " + col);
         hCatColType = connManager.toHCatType(colInfo.get(0));
@@ -734,7 +760,7 @@ public final class SqoopHCatUtilities {
 
       boolean found = false;
       for (String tf : hCatFullTableSchemaFieldNames) {
-        if (tf.equals(col)) {
+        if (tf.equals(lcCol)) {
           found = true;
           break;
         }
@@ -745,14 +771,24 @@ public final class SqoopHCatUtilities {
           + "hcatalog table schema or partition schema");
       }
       if (!userMapped) {
-        HCatFieldSchema hCatFS = hCatFullTableSchema.get(col);
-        if (!hCatFS.getTypeString().equals(hCatColType)) {
-          LOG.warn("The HCatalog field " + col + " has type "
-            + hCatFS.getTypeString() + ".  Expected = " + hCatColType
-            + " based on database column type : "
-            + sqlTypeString(colInfo.get(0)));
-          LOG.warn("The Sqoop job can fail if types are not "
-            + " assignment compatible");
+        HCatFieldSchema hCatFS = hCatFullTableSchema.get(lcCol);
+        // allow hcat complex types to be treated as strings for
+        // mapping purposes
+        if (hCatFS.isComplex() &&
+                (hCatColType.equals("string")
+                        || hCatColType.startsWith("varchar")
+                        || hCatColType.startsWith("char"))) {
+          LOG.info("Complex fields will automatically mapped from"
+            + " string types");
+        } else {
+          if (!hCatFS.getTypeString().equals(hCatColType)) {
+            LOG.warn("The HCatalog field " + col + " has type "
+                    + hCatFS.getTypeString() + ".  Expected = " + hCatColType
+                    + " based on database column type : "
+                    + sqlTypeString(colInfo.get(0)));
+            LOG.warn("The Sqoop job can fail if types are not "
+                    + " assignment compatible");
+          }
         }
       }
 
@@ -760,7 +796,7 @@ public final class SqoopHCatUtilities {
         LOG.warn("Column " + col + " had to be cast to a less precise type "
           + hCatColType + " in hcatalog");
       }
-      hCatFieldPositions[indx] = hCatFullTableSchemaFieldNames.indexOf(col);
+      hCatFieldPositions[indx] = hCatFullTableSchemaFieldNames.indexOf(lcCol);
       if (hCatFieldPositions[indx] < 0) {
         throw new IOException("The HCatalog field " + col
           + " could not be found");
@@ -898,10 +934,11 @@ public final class SqoopHCatUtilities {
     MapWritable columnTypesJava = new MapWritable();
     Properties mapColumnJava = opts.getMapColumnJava();
     for (Map.Entry<String, List<Integer>> e : dbColInfo.entrySet()) {
-      Text columnName = new Text(e.getKey());
+      String key = e.getKey().toLowerCase();
+      Text columnName = new Text(key);
       Text columnText = null;
-      if (mapColumnJava.containsKey(e.getKey())) {
-        columnText = new Text(mapColumnJava.getProperty(e.getKey()));
+      if (mapColumnJava.containsKey(key)) {
+        columnText = new Text(mapColumnJava.getProperty(key));
       } else {
         columnText = new Text(connMgr.toJavaType(dbTable, e.getKey(),
           e.getValue().get(0)));
@@ -910,7 +947,7 @@ public final class SqoopHCatUtilities {
     }
     MapWritable columnTypesSql = new MapWritable();
     for (Map.Entry<String, List<Integer>> e : dbColInfo.entrySet()) {
-      Text columnName = new Text(e.getKey());
+      Text columnName = new Text(e.getKey().toLowerCase());
       IntWritable sqlType = new IntWritable(e.getValue().get(0));
       columnTypesSql.put(columnName, sqlType);
     }
@@ -1070,6 +1107,7 @@ public final class SqoopHCatUtilities {
      case Types.TIME:
      case Types.TIMESTAMP:
      case Types.CLOB:
+     case Types.NCLOB:
        return "string";
 
      case Types.FLOAT:

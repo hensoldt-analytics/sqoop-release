@@ -35,7 +35,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 public class TestSqoopJobDataPublisher extends ImportJobTestCase {
@@ -45,13 +47,12 @@ public class TestSqoopJobDataPublisher extends ImportJobTestCase {
     @Before
     public void setUp() {
         super.setUp();
-        HiveImport.setTestMode(true);
+        DummyDataPublisher.reset();
     }
 
     @After
     public void tearDown() {
         super.tearDown();
-        HiveImport.setTestMode(false);
     }
     /**
      * Create the argv to pass to Sqoop.
@@ -149,10 +150,30 @@ public class TestSqoopJobDataPublisher extends ImportJobTestCase {
         String [] vals = { "'test'", "42", "'somestring'" };
         runImportTest(TABLE_NAME, types, vals, "normalImport.q",
                 getArgv(false, null), new ImportTool());
-        assert (DummyDataPublisher.hiveTable.equals("NORMAL_HIVE_IMPORT"));
-        assert (DummyDataPublisher.storeTable.equals("NORMAL_HIVE_IMPORT"));
-        assert (DummyDataPublisher.storeType.equals("hsqldb"));
-        assert (DummyDataPublisher.operation.equals("import"));
+        assertEquals("NORMAL_HIVE_IMPORT", DummyDataPublisher.hiveTable);
+        assertEquals("NORMAL_HIVE_IMPORT", DummyDataPublisher.storeTable);
+        assertEquals("hsqldb", DummyDataPublisher.storeType);
+        assertEquals("import", DummyDataPublisher.operation);
+    }
+
+    /** Test that failing import won't publish. */
+    @Test
+    public void testFailingHiveImport() throws IOException {
+        final String TABLE_NAME = "NORMAL_HIVE_IMPORT";
+        setCurTableName(TABLE_NAME);
+        setNumCols(3);
+        String[] types = { "VARCHAR(32)", "INTEGER", "CHAR(64)" };
+        String[] vals = { "'test'", "42", "'somestring'" };
+        try {
+            runImportTest(TABLE_NAME, types, vals, "nosuchfile.q", getArgv(false, null), new ImportTool()); // Should throw
+            fail();
+        } catch (IOException e) {
+            // Expected
+        }
+        assertNull(DummyDataPublisher.hiveTable);
+        assertNull(DummyDataPublisher.storeTable);
+        assertNull(DummyDataPublisher.storeType);
+        assertNull(DummyDataPublisher.operation);
     }
 
 }

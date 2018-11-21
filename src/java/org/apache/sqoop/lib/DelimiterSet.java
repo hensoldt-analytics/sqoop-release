@@ -24,12 +24,12 @@ public class DelimiterSet implements Cloneable {
 
   public static final char NULL_CHAR = '\000';
 
-  private char fieldDelim; // fields terminated by this.
-  private char recordDelim; // records terminated by this.
+  private int fieldDelim; // fields terminated by this.
+  private int recordDelim; // records terminated by this.
 
   // If these next two fields are '\000', then they are ignored.
-  private char enclosedBy;
-  private char escapedBy;
+  private int enclosedBy;
+  private int escapedBy;
 
   // If true, then the enclosed-by character is applied to every
   // field, not just ones containing embedded delimiters.
@@ -125,7 +125,7 @@ public class DelimiterSet implements Cloneable {
    * @return the fields-terminated-by character.
    */
   public char getFieldsTerminatedBy() {
-    return this.fieldDelim;
+    return (char) this.fieldDelim;
   }
 
   /**
@@ -139,7 +139,7 @@ public class DelimiterSet implements Cloneable {
    * @return the end-of-record (lines-terminated-by) character.
    */
   public char getLinesTerminatedBy() {
-    return this.recordDelim;
+    return (char) this.recordDelim;
   }
 
   /**
@@ -154,7 +154,7 @@ public class DelimiterSet implements Cloneable {
    * @return the enclosed-by character, or '\000' for none.
    */
   public char getEnclosedBy() {
-    return this.enclosedBy;
+    return (char) this.enclosedBy;
   }
 
   /**
@@ -169,7 +169,7 @@ public class DelimiterSet implements Cloneable {
    * @return the escaped-by character, or '\000' for none.
    */
   public char getEscapedBy() {
-    return this.escapedBy;
+    return (char) this.escapedBy;
   }
 
   /**
@@ -193,10 +193,10 @@ public class DelimiterSet implements Cloneable {
    * @return a string representation of the delimiters.
    */
   public String toString() {
-    return "fields=" + this.fieldDelim
-        + " records=" + this.recordDelim
-        + " escape=" + this.escapedBy
-        + " enclose=" + this.enclosedBy
+    return "fields=" + (char) this.fieldDelim
+        + " records=" + (char) this.recordDelim
+        + " escape=" + (char) this.escapedBy
+        + " enclose=" + (char) this.enclosedBy
         + " required=" + this.encloseRequired;
   }
 
@@ -207,10 +207,10 @@ public class DelimiterSet implements Cloneable {
    * provides this set of delimiters.
    */
   public String formatConstructor() {
-    return "new DelimiterSet((char) " + (int) this.fieldDelim + ", "
-        + "(char) " + (int) this.recordDelim + ", "
-        + "(char) " + (int) this.enclosedBy + ", "
-        + "(char) " + (int) this.escapedBy + ", "
+    return "new DelimiterSet((char) " + this.fieldDelim + ", "
+        + "(char) " + this.recordDelim + ", "
+        + "(char) " + this.enclosedBy + ", "
+        + "(char) " + this.escapedBy + ", "
         + this.encloseRequired + ")";
   }
 
@@ -219,11 +219,11 @@ public class DelimiterSet implements Cloneable {
    * @return a hash code for this set of delimiters.
    */
   public int hashCode() {
-    return (int) this.fieldDelim
-        + (((int) this.recordDelim) << 4)
-        + (((int) this.escapedBy) << 8)
-        + (((int) this.enclosedBy) << 12)
-        + (((int) this.recordDelim) << 16)
+    return this.fieldDelim
+        + ((this.recordDelim) << 4)
+        + ((this.escapedBy) << 8)
+        + ((this.enclosedBy) << 12)
+        + ((this.recordDelim) << 16)
         + (this.encloseRequired ? 0xFEFE : 0x7070);
   }
 

@@ -25,10 +25,17 @@ import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.sqoop.util.ParquetReader;
+import org.apache.orc.OrcFile;
+import org.apache.orc.Reader;
+import org.apache.orc.RecordReader;
 import org.junit.Before;
 import org.junit.After;
 
@@ -38,9 +45,7 @@ import org.apache.sqoop.tool.ImportAllTablesTool;
 import org.junit.Test;
 
 import static java.util.Collections.singletonList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Test the --all-tables functionality that can import multiple tables.
@@ -99,7 +104,7 @@ public class TestAllTables extends ImportJobTestCase {
     this.tableNames = new ArrayList<String>();
     this.expectedStrings = new ArrayList<String>();
 
-    // create two tables.
+    // create three tables.
     this.expectedStrings.add("A winner");
     this.expectedStrings.add("is you!");
     this.expectedStrings.add(null);
@@ -188,6 +193,40 @@ public class TestAllTables extends ImportJobTestCase {
       List<String> result = new ParquetReader(tablePath).readAllInCsv();
       assertEquals("Table " + tableName + " expected a different string",
           singletonList(expectedVal), result);
+    }
+  }
+
+  @Test
+  public void testMultiTableImportAsOrcFormat() throws IOException {
+    String [] argv = getArgv(new String[]{"--as-orcfile"}, null);
+    runImport(new ImportAllTablesTool(), argv);
+
+    Path warehousePath = new Path(this.getWarehouseDir());
+    int i = 0;
+    for (String tableName : this.tableNames) {
+      Path tablePath = new Path(warehousePath, tableName);
+
+      FileSystem fs = FileSystem.get(getConf());
+      FileStatus[] stats = fs.listStatus(tablePath);
+
+      for (FileStatus stat : stats) {
+        if (stat.getPath().getName().endsWith(".orc")) {
+          Reader reader = OrcFile.createReader(stat.getPath(), OrcFile.readerOptions(getConf()));
+          RecordReader rows = reader.rows();
+          VectorizedRowBatch batch = reader.getSchema().createRowBatch();
+          rows.nextBatch(batch);
+          assertEquals(1, batch.size);
+
+          assertEquals(i, ((LongColumnVector) batch.cols[0]).vector[0]);
+          if (expectedStrings.get(i) == null) {
+            assertNull(((BytesColumnVector) batch.cols[1]).vector[0]);
+          } else {
+            assertArrayEquals(expectedStrings.get(i).getBytes(), ((BytesColumnVector) batch.cols[1]).vector[0]);
+          }
+        }
+      }
+
+      i++;
     }
   }
 

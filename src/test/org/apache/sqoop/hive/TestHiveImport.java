@@ -67,13 +67,11 @@ public class TestHiveImport extends ImportJobTestCase {
   @Before
   public void setUp() {
     super.setUp();
-    HiveImport.setTestMode(true);
   }
 
   @After
   public void tearDown() {
     super.tearDown();
-    HiveImport.setTestMode(false);
   }
 
   /**
@@ -517,6 +515,26 @@ public class TestHiveImport extends ImportJobTestCase {
         "--" + BaseSqoopTool.HIVE_PARTITION_VALUE_ARG, "20110413", };
 
     runImportTest(TABLE_NAME, types, vals, "partitionImport.q",
+        getArgv(false, moreArgs), new ImportTool());
+  }
+
+  /**
+   * Test hive import with row that has new line in it.
+   */
+  @Test
+  public void testImportHiveWithPartitionsAndStats() throws IOException,
+      InterruptedException {
+    final String TABLE_NAME = "PARTITION_HIVE_IMPORT";
+
+    LOG.info("Doing import of single row into PARTITION_HIVE_IMPORT table");
+    setCurTableName(TABLE_NAME);
+    setNumCols(3);
+    String[] types = { "VARCHAR(32)", "INTEGER", "CHAR(64)", };
+    String[] vals = { "'whoop'", "42", "'I am a row in a partition'", };
+    String[] moreArgs = { "--" + BaseSqoopTool.HIVE_PARTITION_KEY_ARG, "ds",
+        "--" + BaseSqoopTool.HIVE_PARTITION_VALUE_ARG, "20110413", "--hive-compute-stats", };
+
+    runImportTest(TABLE_NAME, types, vals, "partitionWithStatsImport.q",
         getArgv(false, moreArgs), new ImportTool());
   }
 

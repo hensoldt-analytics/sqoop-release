@@ -196,7 +196,7 @@ public class JobBase {
         File hiveHomeFile = new File(hiveHome);
         File hiveLibFile = new File(hiveHomeFile, "lib");
         if (hiveLibFile.exists()) {
-          addDirToCache(hiveLibFile, fs, localUrls);
+          addDirToCacheWithoutParquet(hiveLibFile, fs, localUrls);
         }
       } else {
         LOG.warn("HIVE_HOME is unset. Cannot add hive libs as dependencies.");
@@ -261,6 +261,20 @@ public class JobBase {
     for (File libfile : dir.listFiles()) {
       if (libfile.exists() && !libfile.isDirectory()
           && libfile.getName().endsWith("jar")) {
+        addToCache(libfile.toString(), fs, localUrls);
+      }
+    }
+  }
+
+
+  private void addDirToCacheWithoutParquet(File dir, FileSystem fs, Set<String> localUrls) {
+    if (null == dir) {
+      return;
+    }
+
+    for (File libfile : dir.listFiles()) {
+      if (libfile.exists() && !libfile.isDirectory()
+              && libfile.getName().endsWith("jar") && !libfile.getName().toLowerCase().startsWith("parquet")) {
         addToCache(libfile.toString(), fs, localUrls);
       }
     }

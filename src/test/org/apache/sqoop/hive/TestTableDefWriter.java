@@ -38,6 +38,7 @@ import org.junit.rules.ExpectedException;
 
 import java.sql.Types;
 
+import static org.apache.sqoop.SqoopOptions.FileLayout.OrcFile;
 import static org.apache.sqoop.SqoopOptions.FileLayout.ParquetFile;
 import static org.apache.sqoop.mapreduce.parquet.ParquetConstants.SQOOP_PARQUET_AVRO_SCHEMA_KEY;
 import static org.junit.Assert.assertEquals;
@@ -278,4 +279,37 @@ public class TestTableDefWriter {
     when(connManager.getColumnNames(tableName)).thenReturn(typeMap.keySet().toArray(new String[]{}));
   }
 
+  @Test
+  public void testHiveComputeStats() throws Exception {
+    options.setHiveDatabaseName("db");
+    options.setComputeStatsHiveTable(true);
+
+    String createTable = writer.getCreateTableStmt();
+    assertNotNull(createTable);
+    assertTrue(createTable.contains("`db`.`outputTable`"));
+
+    String loadStmt = writer.getLoadDataStmt();
+    assertNotNull(loadStmt);
+    assertTrue(createTable.contains("`db`.`outputTable`"));
+
+    String computeStatsStmt = writer.getComputeStatsStmt();
+    LOG.info("Compute stats stmt " + computeStatsStmt);
+    assertNotNull(computeStatsStmt);
+    assertTrue(computeStatsStmt.length() > 0);
+    assertTrue(computeStatsStmt.matches("ANALYZE TABLE `db`.`outputTable`.*COMPUTE STATISTICS"));
+  }
+
+  /**
+   * If --as-orcfile is specified. Sqoop should create Hive table
+   * as ORC.
+   * @throws Exception
+   */
+  @Test
+  public void testOrcFormatInCreateStatement() throws Exception {
+    options.setFileLayout(OrcFile);
+
+    String createTable = writer.getCreateTableStmt();
+    assertNotNull(createTable);
+    assertTrue(createTable.contains("STORED AS ORC"));
+  }
 }

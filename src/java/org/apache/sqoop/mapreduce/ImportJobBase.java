@@ -47,7 +47,6 @@ import org.apache.sqoop.validation.ValidationException;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Date;
 
 import static org.apache.sqoop.mapreduce.parquet.ParquetConstants.SQOOP_PARQUET_OUTPUT_CODEC_KEY;
 
@@ -58,7 +57,6 @@ import static org.apache.sqoop.mapreduce.parquet.ParquetConstants.SQOOP_PARQUET_
 public class ImportJobBase extends JobBase {
 
   private ImportJobContext context;
-  private long startTime;
   public static final String OPERATION = "import";
   public static final Log LOG = LogFactory.getLog(
       ImportJobBase.class.getName());
@@ -86,7 +84,6 @@ public class ImportJobBase extends JobBase {
       final ImportJobContext context) {
     super(opts, mapperClass, inputFormatClass, outputFormatClass);
     this.context = context;
-    this.startTime = new Date().getTime();
   }
 
   /**
@@ -278,12 +275,6 @@ public class ImportJobBase extends JobBase {
 
       if (options.isValidationEnabled()) {
         validateImport(tableName, conf, job);
-      }
-
-      if (options.doHiveImport() || isHCatJob) {
-        // Publish data for import job, only hive/hcat import jobs are supported now.
-        LOG.info("Publishing Hive/Hcat import job data to Listeners for table " + tableName);
-        PublishJobData.publishJobData(conf, options, OPERATION, tableName, startTime);
       }
 
     } catch (InterruptedException ie) {

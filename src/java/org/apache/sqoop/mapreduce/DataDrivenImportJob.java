@@ -26,6 +26,7 @@ import org.apache.avro.Schema;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
@@ -36,6 +37,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.apache.orc.mapreduce.OrcOutputFormat;
 import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
 
 import org.apache.sqoop.SqoopOptions;
@@ -43,7 +45,6 @@ import org.apache.sqoop.config.ConfigurationHelper;
 import org.apache.sqoop.lib.LargeObjectLoader;
 import org.apache.sqoop.manager.ConnManager;
 import org.apache.sqoop.manager.ImportJobContext;
-import org.apache.sqoop.mapreduce.ImportJobBase;
 import org.apache.sqoop.mapreduce.db.DBConfiguration;
 import org.apache.sqoop.mapreduce.db.DataDrivenDBInputFormat;
 import org.apache.sqoop.mapreduce.parquet.ParquetImportJobConfigurator;
@@ -163,6 +164,9 @@ public class DataDrivenImportJob extends ImportJobBase {
     } else if (options.getFileLayout()
         == SqoopOptions.FileLayout.ParquetFile) {
       return parquetImportJobConfigurator.getMapperClass();
+    } else if (options.getFileLayout()
+            == SqoopOptions.FileLayout.OrcFile) {
+      return OrcImportMapper.class;
     }
 
     return null;
@@ -186,6 +190,9 @@ public class DataDrivenImportJob extends ImportJobBase {
     } else if (options.getFileLayout()
         == SqoopOptions.FileLayout.ParquetFile) {
       return parquetImportJobConfigurator.getOutputFormatClass();
+    } else if (options.getFileLayout()
+            == SqoopOptions.FileLayout.OrcFile) {
+      return OrcOutputFormat.class;
     }
 
     return null;

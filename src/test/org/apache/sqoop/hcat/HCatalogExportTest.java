@@ -28,6 +28,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -60,7 +61,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class HCatalogExportTest extends ExportJobTestCase {
   private static final Log LOG =
-    LogFactory.getLog(HCatalogExportTest.class);
+          LogFactory.getLog(HCatalogExportTest.class);
   private HCatalogTestUtils utils = HCatalogTestUtils.instance();
 
   @Rule
@@ -75,6 +76,7 @@ public class HCatalogExportTest extends ExportJobTestCase {
       throw new RuntimeException("Error initializing HCatTestUtilis", e);
     }
   }
+
   /**
    * @return an argv for the CodeGenTool to use when creating tables to export.
    */
@@ -102,13 +104,13 @@ public class HCatalogExportTest extends ExportJobTestCase {
    * given column meet the expected values.
    */
   protected void assertColMinAndMax(String colName, ColumnGenerator generator)
-    throws SQLException {
+          throws SQLException {
     Connection conn = getConnection();
     int minId = getMinRowId(conn);
     int maxId = getMaxRowId(conn);
     String table = getTableName();
     LOG.info("Checking min/max for column " + colName + " with type "
-      + SqoopHCatUtilities.sqlTypeString(generator.getSqlType()));
+            + SqoopHCatUtilities.sqlTypeString(generator.getSqlType()));
 
     Object expectedMin = generator.getDBValue(minId);
     Object expectedMax = generator.getDBValue(maxId);
@@ -118,10 +120,10 @@ public class HCatalogExportTest extends ExportJobTestCase {
   }
 
   protected void runHCatExport(List<String> addlArgsArray,
-    final int totalRecords, String table,
-    ColumnGenerator[] cols) throws Exception {
+                               final int totalRecords, String table,
+                               ColumnGenerator[] cols) throws Exception {
     utils.createHCatTable(CreateMode.CREATE_AND_LOAD,
-      totalRecords, table, cols);
+            totalRecords, table, cols);
     utils.createSqlTable(getConnection(), true, totalRecords, table, false, cols);
     Map<String, String> addlArgsMap = utils.getAddlTestArgs();
     addlArgsArray.add("--verbose");
@@ -143,7 +145,7 @@ public class HCatalogExportTest extends ExportJobTestCase {
       }
     }
     String[] exportArgs = getArgv(true, 10, 10, newStrArray(argv,
-      addlArgsArray.toArray(new String[0])));
+            addlArgsArray.toArray(new String[0])));
     LOG.debug("Export args = " + Arrays.toString(exportArgs));
     SqoopHCatUtilities.instance().setConfigured(false);
     runExport(exportArgs);
@@ -157,22 +159,22 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testIntTypes() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "boolean", Types.BOOLEAN, HCatFieldSchema.Type.BOOLEAN, 0, 0,
-        Boolean.TRUE, Boolean.TRUE, KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "tinyint", Types.INTEGER, HCatFieldSchema.Type.INT, 0, 0, 10,
-        10, KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
-        "smallint", Types.INTEGER, HCatFieldSchema.Type.INT, 0, 0, 100,
-        100, KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
-        "int", Types.INTEGER, HCatFieldSchema.Type.INT, 0, 0, 1000,
-        1000, KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(4),
-        "bigint", Types.BIGINT, HCatFieldSchema.Type.BIGINT, 0, 0, 10000L,
-        10000L, KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "boolean", Types.BOOLEAN, HCatFieldSchema.Type.BOOLEAN, 0, 0,
+                    Boolean.TRUE, Boolean.TRUE, KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "tinyint", Types.INTEGER, HCatFieldSchema.Type.INT, 0, 0, 10,
+                    10, KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                    "smallint", Types.INTEGER, HCatFieldSchema.Type.INT, 0, 0, 100,
+                    100, KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
+                    "int", Types.INTEGER, HCatFieldSchema.Type.INT, 0, 0, 1000,
+                    1000, KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(4),
+                    "bigint", Types.BIGINT, HCatFieldSchema.Type.BIGINT, 0, 0, 10000L,
+                    10000L, KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
@@ -199,16 +201,16 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testFloatTypes() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "float", Types.FLOAT, HCatFieldSchema.Type.FLOAT, 0, 0, 10.0F,
-        10.F, KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "real", Types.FLOAT, HCatFieldSchema.Type.FLOAT, 0, 0, 20.0F,
-        20.0F, KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
-        "double", Types.DOUBLE, HCatFieldSchema.Type.DOUBLE, 0, 0, 30.0D,
-        30.0D, KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "float", Types.FLOAT, HCatFieldSchema.Type.FLOAT, 0, 0, 10.0F,
+                    10.F, KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "real", Types.FLOAT, HCatFieldSchema.Type.FLOAT, 0, 0, 20.0F,
+                    20.0F, KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                    "double", Types.DOUBLE, HCatFieldSchema.Type.DOUBLE, 0, 0, 30.0D,
+                    30.0D, KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
@@ -218,17 +220,17 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testNumberTypes() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "numeric(18,2)", Types.NUMERIC, HCatFieldSchema.Type.STRING, 0, 0,
-        "1000", new BigDecimal("1000"), KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "decimal(18,2)", Types.DECIMAL, HCatFieldSchema.Type.STRING, 0, 0,
-        "2000", new BigDecimal("2000"), KeyType.NOT_A_KEY),
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
-          "decimal(18,2)", Types.DECIMAL, HCatFieldSchema.Type.DECIMAL, 18, 2,
-          HiveDecimal.create(new BigDecimal("2000")),
-          new BigDecimal("2000"), KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "numeric(18,2)", Types.NUMERIC, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1000", new BigDecimal("1000"), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "decimal(18,2)", Types.DECIMAL, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2000", new BigDecimal("2000"), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                    "decimal(18,2)", Types.DECIMAL, HCatFieldSchema.Type.DECIMAL, 18, 2,
+                    HiveDecimal.create(new BigDecimal("2000")),
+                    new BigDecimal("2000"), KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
@@ -238,26 +240,26 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testDateTypes() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "date", Types.DATE, HCatFieldSchema.Type.STRING, 0, 0,
-        "2013-12-31", new Date(113, 11, 31), KeyType.NOT_A_KEY),
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-          "date", Types.DATE, HCatFieldSchema.Type.DATE, 0, 0,
-          new Date(113, 11, 31),
-          new Date(113, 11, 31), KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
-        "time", Types.TIME, HCatFieldSchema.Type.STRING, 0, 0,
-        "10:11:12", new Time(10, 11, 12), KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
-        "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.STRING, 0, 0,
-        "2013-12-31 10:11:12", new Timestamp(113, 11, 31, 10, 11, 12, 0),
-        KeyType.NOT_A_KEY),
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(4),
-          "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.TIMESTAMP, 0, 0,
-          new Timestamp(113, 11, 31, 10, 11, 12, 0),
-          new Timestamp(113, 11, 31, 10, 11, 12, 0),
-          KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "date", Types.DATE, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2013-12-31", new Date(113, 11, 31), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "date", Types.DATE, HCatFieldSchema.Type.DATE, 0, 0,
+                    new Date(113, 11, 31),
+                    new Date(113, 11, 31), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                    "time", Types.TIME, HCatFieldSchema.Type.STRING, 0, 0,
+                    "10:11:12", new Time(10, 11, 12), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
+                    "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2013-12-31 10:11:12", new Timestamp(113, 11, 31, 10, 11, 12, 0),
+                    KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(4),
+                    "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.TIMESTAMP, 0, 0,
+                    new Timestamp(113, 11, 31, 10, 11, 12, 0),
+                    new Timestamp(113, 11, 31, 10, 11, 12, 0),
+                    KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
@@ -268,17 +270,17 @@ public class HCatalogExportTest extends ExportJobTestCase {
     final int TOTAL_RECORDS = 1 * 10;
     long offset = TimeZone.getDefault().getRawOffset();
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "date", Types.DATE, HCatFieldSchema.Type.BIGINT, 0, 0, 0 - offset,
-        new Date(70, 0, 1), KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "time", Types.TIME, HCatFieldSchema.Type.BIGINT, 0, 0,
-        36672000L - offset, new Time(10, 11, 12), KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
-        "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.BIGINT, 0, 0,
-        36672000L - offset, new Timestamp(70, 0, 1, 10, 11, 12, 0),
-        KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "date", Types.DATE, HCatFieldSchema.Type.BIGINT, 0, 0, 0 - offset,
+                    new Date(70, 0, 1), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "time", Types.TIME, HCatFieldSchema.Type.BIGINT, 0, 0,
+                    36672000L - offset, new Time(10, 11, 12), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                    "timestamp", Types.TIMESTAMP, HCatFieldSchema.Type.BIGINT, 0, 0,
+                    36672000L - offset, new Timestamp(70, 0, 1, 10, 11, 12, 0),
+                    KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--map-column-hive");
@@ -290,21 +292,21 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testStringTypes() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "char(14)", Types.CHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "string to test", "string to test", KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-          "char(14)", Types.CHAR, HCatFieldSchema.Type.CHAR, 14, 0,
-          new HiveChar("string to test", 14), "string to test",
-          KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
-          "char(14)", Types.CHAR, HCatFieldSchema.Type.VARCHAR, 14, 0,
-          new HiveVarchar("string to test", 14), "string to test",
-          KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
-        "longvarchar", Types.LONGVARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "string to test", "string to test", KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "char(14)", Types.CHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "string to test", "string to test", KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "char(14)", Types.CHAR, HCatFieldSchema.Type.CHAR, 14, 0,
+                    new HiveChar("string to test", 14), "string to test",
+                    KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                    "char(14)", Types.CHAR, HCatFieldSchema.Type.VARCHAR, 14, 0,
+                    new HiveVarchar("string to test", 14), "string to test",
+                    KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(3),
+                    "longvarchar", Types.LONGVARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "string to test", "string to test", KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
@@ -312,16 +314,16 @@ public class HCatalogExportTest extends ExportJobTestCase {
 
   @Test
   public void testBinaryTypes() throws Exception {
-    ByteBuffer bb = ByteBuffer.wrap(new byte[] { 0, 1, 2 });
+    ByteBuffer bb = ByteBuffer.wrap(new byte[]{0, 1, 2});
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "binary(10)", Types.BINARY, HCatFieldSchema.Type.BINARY, 0, 0,
-        bb.array(), bb.array(), KeyType.NOT_A_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "varbinary(10)", Types.BINARY, HCatFieldSchema.Type.BINARY, 0, 0,
-        bb.array(), bb.array(), KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "binary(10)", Types.BINARY, HCatFieldSchema.Type.BINARY, 0, 0,
+                    bb.array(), bb.array(), KeyType.NOT_A_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "varbinary(10)", Types.BINARY, HCatFieldSchema.Type.BINARY, 0, 0,
+                    bb.array(), bb.array(), KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
@@ -331,10 +333,10 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testColumnProjection() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "1", null, KeyType.NOT_A_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", null, KeyType.NOT_A_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--columns");
@@ -347,10 +349,10 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testStaticPartitioning() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "1", "1", KeyType.STATIC_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", "1", KeyType.STATIC_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--hive-partition-key");
@@ -365,13 +367,13 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testStaticPartitioningWithMultipleKeys() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "1", "1", KeyType.STATIC_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "2", "2", KeyType.STATIC_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", "1", KeyType.STATIC_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2", "2", KeyType.STATIC_KEY),
     };
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--hcatalog-partition-keys");
@@ -386,10 +388,10 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testDynamicPartitioning() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "1", "1", KeyType.DYNAMIC_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", "1", KeyType.DYNAMIC_KEY),
     };
 
     List<String> addlArgsArray = new ArrayList<String>();
@@ -400,13 +402,13 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testStaticAndDynamicPartitioning() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "1", "1", KeyType.STATIC_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "2", "2", KeyType.DYNAMIC_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", "1", KeyType.STATIC_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2", "2", KeyType.DYNAMIC_KEY),
     };
 
     List<String> addlArgsArray = new ArrayList<String>();
@@ -421,16 +423,16 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testMultipleStaticKeysAndDynamicPartitioning() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "1", "1", KeyType.STATIC_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "2", "2", KeyType.STATIC_KEY),
-      HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
-        "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-        "3", "3", KeyType.DYNAMIC_KEY),
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", "1", KeyType.STATIC_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2", "2", KeyType.STATIC_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(2),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "3", "3", KeyType.DYNAMIC_KEY),
     };
 
     List<String> addlArgsArray = new ArrayList<String>();
@@ -448,13 +450,13 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testSequenceFile() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-            "1", "1", KeyType.STATIC_KEY),
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-            "2", "2", KeyType.DYNAMIC_KEY), };
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", "1", KeyType.STATIC_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2", "2", KeyType.DYNAMIC_KEY),};
 
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--hive-partition-key");
@@ -469,13 +471,13 @@ public class HCatalogExportTest extends ExportJobTestCase {
   public void testTextFile() throws Exception {
     final int TOTAL_RECORDS = 1 * 10;
     String table = getTableName().toUpperCase();
-    ColumnGenerator[] cols = new ColumnGenerator[] {
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
-            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-            "1", "1", KeyType.STATIC_KEY),
-        HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
-            "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
-            "2", "2", KeyType.DYNAMIC_KEY), };
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(0),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "1", "1", KeyType.STATIC_KEY),
+            HCatalogTestUtils.colGenerator(HCatalogTestUtils.forIdx(1),
+                    "varchar(20)", Types.VARCHAR, HCatFieldSchema.Type.STRING, 0, 0,
+                    "2", "2", KeyType.DYNAMIC_KEY),};
 
     List<String> addlArgsArray = new ArrayList<String>();
     addlArgsArray.add("--hive-partition-key");
@@ -483,6 +485,56 @@ public class HCatalogExportTest extends ExportJobTestCase {
     addlArgsArray.add("--hive-partition-value");
     addlArgsArray.add("1");
     utils.setStorageInfo(HCatalogTestUtils.STORED_AS_TEXT);
+    runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
+  }
+
+  @Test
+  public void testComplexTypes() throws Exception {
+    final int TOTAL_RECORDS = 1 * 10;
+    String table = getTableName().toUpperCase();
+    List<Object> rootObj = new ArrayList<Object>();
+    Map<String, Object> map = new HashMap<String, Object>();
+    List<Object> struct = new ArrayList<Object>();
+    Byte b = 100;
+    Short s = 15000;
+    Integer i = 60000;
+    Long l = 250000000L;
+    Boolean bo = true;
+    BigDecimal bd = new BigDecimal("8435890390495472793");
+    Float fl = 0.5f;
+    Double d = 0.75;
+    Date dt = new Date(116, 04, 05);
+    Timestamp ts = new Timestamp(116, 04, 05, 10, 20, 30, 0);
+    String s1 = "Test string";
+    String s2 = "Test string2";
+    String s3 = "Test string3";
+
+    struct.add(b);
+    struct.add(s);
+    struct.add(i);
+    struct.add(l);
+    struct.add(bo);
+    struct.add(HiveDecimal.create(bd));
+    struct.add(fl);
+    struct.add(d);
+    struct.add(dt);
+    struct.add(ts);
+    struct.add(s1);
+    struct.add(new HiveVarchar(s2, 15));
+    struct.add(new HiveChar(s3, 15));
+    map.put("mykey", struct);
+    rootObj.add(map);
+    ColumnGenerator[] cols = new ColumnGenerator[]{
+            HCatalogTestUtils.colGeneratorWithHCatType(HCatalogTestUtils.forIdx(0), "varchar(100)", Types.VARCHAR,
+                    HCatFieldSchema.Type.ARRAY, 0, 0, rootObj,
+                    "[{\"mykey\":[100,15000,60000,250000000,true,"
+                            + "\"8435890390495472793\",0.5,0.75,\"2016-05-05\",\"2016-05-05 10:20:30\""
+                            + ",\"Test string\",\"Test string2\",\"Test string3   \"]}]", KeyType.NOT_A_KEY,
+                    "array<map<string,struct<ti:tinyint,si:smallint,i:int,bi:bigint,bo:boolean,de:decimal(38,10),"
+                            + "f:float,d:double,dt:date,ts:timestamp,s:string,vc:varchar(15),c:char(15)>>>"),
+    };
+    List<String> addlArgsArray = new ArrayList<String>();
+    utils.setStorageInfo(HCatalogTestUtils.STORED_AS_ORCFILE);
     runHCatExport(addlArgsArray, TOTAL_RECORDS, table, cols);
   }
 

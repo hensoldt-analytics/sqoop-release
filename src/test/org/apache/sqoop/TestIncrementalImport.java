@@ -1333,7 +1333,6 @@ public class TestIncrementalImport  {
 		args.add("-m");
 		args.add("1");
 		createJob(TABLE_NAME, args, conf);
-		HiveImport.setTestMode(true);
 		String hiveHome = org.apache.sqoop.SqoopOptions.getHiveHomeDefault();
 		assertNotNull("hive.home was not set", hiveHome);
 		String testDataPath = new Path(new Path(hiveHome), "scripts/"

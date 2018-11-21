@@ -210,6 +210,8 @@ public class TableDefWriter {
 
     if (SqoopOptions.FileLayout.ParquetFile.equals(options.getFileLayout())) {
       sb.append("STORED AS PARQUET");
+    } else if (SqoopOptions.FileLayout.OrcFile.equals(options.getFileLayout())) {
+        sb.append("STORED AS ORC");
     } else {
       sb.append("ROW FORMAT DELIMITED FIELDS TERMINATED BY '");
       sb.append(getHiveOctalCharCode((int) options.getOutputFieldDelim()));
@@ -308,6 +310,33 @@ public class TableDefWriter {
 
     LOG.debug("Load statement: " + sb.toString());
     return sb.toString();
+  }
+
+  /**
+   * @return the LOAD DATA statement to import the data in HDFS into hive.
+   */
+  public String getComputeStatsStmt() throws IOException {
+    if (options.doComputeStatsHiveTable()) {
+      StringBuilder sb = new StringBuilder();
+      sb.append("ANALYZE TABLE `");
+      if(options.getHiveDatabaseName() != null) {
+        sb.append(options.getHiveDatabaseName()).append("`.`");
+      }
+      sb.append(outputTableName);
+      sb.append('`');
+
+      if (options.getHivePartitionKey() != null) {
+        sb.append(" PARTITION (")
+          .append(options.getHivePartitionKey())
+          .append("='").append(options.getHivePartitionValue())
+          .append("')");
+      }
+      sb.append(" COMPUTE STATISTICS");
+      LOG.debug("Compute Statistics statement: " + sb.toString());
+      return sb.toString();
+    } else {
+      return null;
+    }
   }
 
   public Path getFinalPath() throws IOException {

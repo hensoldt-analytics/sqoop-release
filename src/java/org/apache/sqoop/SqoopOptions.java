@@ -88,7 +88,8 @@ public class SqoopOptions implements Cloneable {
     SequenceFile,
     AvroDataFile,
     ParquetFile,
-    BinaryFile
+    BinaryFile,
+    OrcFile
   }
 
   /**
@@ -228,6 +229,7 @@ public class SqoopOptions implements Cloneable {
   private String hiveHome; // not serialized to metastore.
   @StoredAsProperty("hive.import") private boolean hiveImport;
   @StoredAsProperty("hive.overwrite.table") private boolean overwriteHiveTable;
+  @StoredAsProperty("hive.compute.stats.table") private boolean computeStatsHiveTable;
   @StoredAsProperty("hive.fail.table.exists")
   private boolean failIfHiveTableExists;
   @StoredAsProperty("hive.external.table.dir") private String hiveExternalTableDir;
@@ -1602,6 +1604,17 @@ public class SqoopOptions implements Cloneable {
 
   public void setOverwriteHiveTable(boolean overwrite) {
     this.overwriteHiveTable = overwrite;
+  }
+
+  /**
+   * @return the user-specified option to compute statistics after loading a hive table.
+   */
+  public boolean doComputeStatsHiveTable() {
+    return computeStatsHiveTable;
+  }
+
+  public void setComputeStatsHiveTable(boolean compute) {
+    this.computeStatsHiveTable = compute;
   }
 
   /**

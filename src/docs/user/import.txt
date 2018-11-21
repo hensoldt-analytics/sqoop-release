@@ -60,6 +60,7 @@ Argument                                    Description
 +\--as-sequencefile+                        Imports data to SequenceFiles
 +\--as-textfile+                            Imports data as plain text (default)
 +\--as-parquetfile+                         Imports data to Parquet Files
++\--as-orcfile+                             Imports data to ORC Files
 +\--parquet-configurator-implementation+    Sets the implementation used during Parquet import. Supported value: hadoop.
 +\--boundary-query <statement>+             Boundary query to use for creating splits
 +\--columns <col,col,col...>+               Columns to import from table

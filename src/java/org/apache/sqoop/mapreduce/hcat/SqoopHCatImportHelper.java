@@ -18,17 +18,6 @@
 
 package org.apache.sqoop.mapreduce.hcat;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.MathContext;
-import java.sql.Date;
-import java.sql.SQLException;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Properties;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -36,7 +25,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DefaultStringifier;
@@ -51,12 +43,34 @@ import org.apache.hive.hcatalog.mapreduce.InputJobInfo;
 import org.apache.hive.hcatalog.mapreduce.StorerInfo;
 import org.apache.sqoop.lib.SqoopRecord;
 import org.apache.sqoop.mapreduce.ImportJobBase;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.type.ArrayType;
+import org.codehaus.jackson.map.type.CollectionType;
+import org.codehaus.jackson.map.type.MapType;
+import org.codehaus.jackson.map.type.TypeFactory;
 
 import org.apache.sqoop.lib.BlobRef;
 import org.apache.sqoop.lib.ClobRef;
 import org.apache.sqoop.lib.DelimiterSet;
 import org.apache.sqoop.lib.FieldFormatter;
 import org.apache.sqoop.lib.LargeObjectLoader;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.sql.SQLException;
+import java.sql.Time;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.hadoop.hive.common.type.Timestamp;
+import org.apache.hadoop.hive.common.type.Date;
 
 /**
  * Helper class for Sqoop HCat Integration import jobs.
@@ -80,6 +94,10 @@ public class SqoopHCatImportHelper {
   private String[] staticPartitionKeys;
   private int[] hCatFieldPositions;
   private int colCount;
+  private Pattern numberPattern;
+  // Jackson related
+  private ObjectMapper mapper;
+
 
   public SqoopHCatImportHelper(Configuration conf) throws IOException,
     InterruptedException {
@@ -138,6 +156,9 @@ public class SqoopHCatImportHelper {
     for (int i = 0; i < fPos.length; ++i) {
       hCatFieldPositions[i] = fPos[i].get();
     }
+    numberPattern = Pattern.compile("\\d+");
+    mapper = new ObjectMapper();
+
 
     LOG.debug("Hive delims replacement enabled : " + doHiveDelimsReplacement);
     LOG.debug("Hive Delimiters : " + hiveDelimiters.toString());
@@ -206,261 +227,435 @@ public class SqoopHCatImportHelper {
     return result;
   }
 
-  private Object toHCat(Object val, HCatFieldSchema hfs) {
+  private Object toHCat(Object val, HCatFieldSchema hfs) throws IOException {
     HCatFieldSchema.Type hfsType = hfs.getType();
     if (val == null) {
       return null;
     }
 
     Object retVal = null;
-
-    if (val instanceof Number) {
-      retVal = convertNumberTypes(val, hfs);
-    } else if (val instanceof Boolean) {
-      retVal = convertBooleanTypes(val, hfs);
-    } else if (val instanceof String) {
-      retVal = convertStringTypes(val, hfs);
-    } else if (val instanceof java.util.Date) {
-      retVal = converDateTypes(val, hfs);
-    } else if (val instanceof BytesWritable) {
-      if (hfsType == HCatFieldSchema.Type.BINARY) {
-        BytesWritable bw = (BytesWritable) val;
-        retVal = bw.getBytes();
+    if (hfs.isComplex()) {
+      String str;
+      Map<?, ?> map = null;
+      List<?> struct = null;
+      List<?> array = null;
+      if (val instanceof Map) {
+        map = convertJSonMapToHCatMap((Map<?,?>) val, hfs);
+        return map;
+      } else if (val instanceof List){
+        if (hfs.getType() == HCatFieldSchema.Type.ARRAY) {
+           array = convertJSonListToHCatArray((List<?>) val, hfs);
+          return array;
+        } else {
+          struct = convertJSonListToHCatStruct((List<?>) val, hfs);
+          return struct;
+        }
+      } else {
+        if (val instanceof String) {
+          str = val.toString();
+        } else if (val instanceof ClobRef) {
+          ClobRef cr = (ClobRef) val;
+          str = cr.isExternal() ? cr.toString() : cr.getData();
+        }  else {
+          return null;
+        }
+        switch (hfs.getType()) {
+          case ARRAY:
+            array = convertJSonStringToHCatArray(str, hfs);
+            return array;
+          case MAP:
+            map = convertJSonStringToHCatMap(str, hfs);
+            return map;
+          case STRUCT:
+            struct = convertJSonStringToHCatStruct(str, hfs);
+            return struct;
+        }
       }
-    } else if (val instanceof BlobRef) {
-      if (hfsType == HCatFieldSchema.Type.BINARY) {
-        BlobRef br = (BlobRef) val;
-        byte[] bytes = br.isExternal() ? br.toString().getBytes() : br
-          .getData();
-        retVal = bytes;
-      }
-    } else if (val instanceof ClobRef) {
-      retVal = convertClobType(val, hfs);
-    } else {
-      throw new UnsupportedOperationException("Objects of type "
-        + val.getClass().getName() + " are not suported");
     }
-    if (retVal == null) {
-      LOG.error("Unable to convert [" + val
-        + "]  of type " + val.getClass().getName()
-        + " to HCatalog type " + hfs.getTypeString());
+    else {
+      PrimitiveTypeInfo typeInfo = hfs.getTypeInfo();
+      if (val instanceof Number) {
+        retVal = convertNumberToPrimitiveTypes(val, typeInfo);
+      } else if (val instanceof Boolean) {
+        retVal = convertBooleanToPrimitiveTypes(val, typeInfo);
+      } else if (val instanceof String) {
+        retVal = convertStringToPrimitiveTypes(val.toString(), typeInfo);
+      } else if (val instanceof java.util.Date) {
+        retVal = converDateToPrimitiveTypes(val, typeInfo);
+      } else if (val instanceof BytesWritable) {
+        if (hfsType == HCatFieldSchema.Type.BINARY) {
+          BytesWritable bw = (BytesWritable) val;
+          retVal = bw.getBytes();
+        }
+      } else if (val instanceof BlobRef) {
+        if (hfsType == HCatFieldSchema.Type.BINARY) {
+          BlobRef br = (BlobRef) val;
+          byte[] bytes = br.isExternal() ? br.toString().getBytes() : br.getData();
+          retVal = bytes;
+        }
+      } else if (val instanceof ClobRef) {
+        retVal = convertClobToPrimitiveTypes(val, typeInfo);
+      } else {
+        throw new UnsupportedOperationException("Objects of type "
+                + val.getClass().getName() + " are not suported");
+      }
+      if (retVal == null) {
+        LOG.error("Unable to convert [" + val
+                + "]  of type " + val.getClass().getName()
+                + " to HCatalog type " + hfs.getTypeString());
+      }
     }
     return retVal;
   }
 
-  private Object convertClobType(Object val, HCatFieldSchema hfs) {
-    HCatFieldSchema.Type hfsType = hfs.getType();
+  private Object convertClobToPrimitiveTypes(Object val, PrimitiveTypeInfo typeInfo) {
+    PrimitiveObjectInspector.PrimitiveCategory category = typeInfo.getPrimitiveCategory();
     ClobRef cr = (ClobRef) val;
     String s = cr.isExternal() ? cr.toString() : cr.getData();
-
-    if (hfsType == HCatFieldSchema.Type.STRING) {
-      return s;
-    } else if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-      VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
-      HiveVarchar hvc = new HiveVarchar(s, vti.getLength());
-      return hvc;
-    } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-      CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-      HiveChar hc = new HiveChar(s, cti.getLength());
-      return hc;
+    switch(category) {
+      case STRING:
+        return s;
+      case VARCHAR:
+        VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
+        HiveVarchar hvc = new HiveVarchar(s, vti.getLength());
+        return hvc;
+      case CHAR:
+        CharTypeInfo cti = (CharTypeInfo) typeInfo;
+        HiveChar hc = new HiveChar(s, cti.getLength());
+        return hc;
     }
     return null;
   }
 
-  private Object converDateTypes(Object val, HCatFieldSchema hfs) {
-    HCatFieldSchema.Type hfsType = hfs.getType();
+  private Date sqlToHiveDate(java.util.Date dt) {
+    return Date.ofEpochMilli(dt.getTime());
+  }
+
+  private Timestamp sqlToHiveTimestamp(java.util.Date t) {
+    return Timestamp.ofEpochMilli(t.getTime());
+  }
+
+  private Object converDateToPrimitiveTypes(Object val, PrimitiveTypeInfo typeInfo) {
+    PrimitiveObjectInspector.PrimitiveCategory category = typeInfo.getPrimitiveCategory();
     Date d;
     Time t;
     Timestamp ts;
     if (val instanceof java.sql.Date) {
-      d = (Date) val;
-      if (hfsType == HCatFieldSchema.Type.DATE) {
-        return d;
-      } else if (hfsType == HCatFieldSchema.Type.TIMESTAMP) {
-        return new Timestamp(d.getTime());
-      } else if (hfsType == HCatFieldSchema.Type.BIGINT) {
-        return (d.getTime());
-      } else if (hfsType == HCatFieldSchema.Type.STRING) {
-        return val.toString();
-      } else if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-        VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
-        HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
-        return hvc;
-      } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-        CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-        HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
-        return hChar;
+      d = sqlToHiveDate((java.sql.Date)val);
+      switch(category) {
+        case DATE:
+          return d;
+        case TIMESTAMP:
+          return sqlToHiveTimestamp((java.sql.Date)val);
+        case LONG:
+          return (d.toEpochMilli());
+        case STRING:
+          return val.toString();
+        case VARCHAR:
+          VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
+          HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
+          return hvc;
+        case CHAR:
+          CharTypeInfo cti = (CharTypeInfo) typeInfo;
+          HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
+          return hChar;
       }
     } else if (val instanceof java.sql.Time) {
       t = (Time) val;
-      if (hfsType == HCatFieldSchema.Type.DATE) {
-        return new Date(t.getTime());
-      } else if (hfsType == HCatFieldSchema.Type.TIMESTAMP) {
-        return new Timestamp(t.getTime());
-      } else if (hfsType == HCatFieldSchema.Type.BIGINT) {
-        return ((Time) val).getTime();
-      } else if (hfsType == HCatFieldSchema.Type.STRING) {
-        return val.toString();
-      } else if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-        VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
-        HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
-        return hvc;
-      } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-        CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-        HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
-        return hChar;
+      switch(category) {
+        case DATE:
+          return sqlToHiveDate(t);
+        case TIMESTAMP:
+          return sqlToHiveTimestamp(t);
+        case LONG:
+          return ((Time) val).getTime();
+        case STRING:
+          return val.toString();
+        case VARCHAR:
+          VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
+          HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
+          return hvc;
+        case CHAR:
+          CharTypeInfo cti = (CharTypeInfo) typeInfo;
+          HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
+          return hChar;
       }
     } else if (val instanceof java.sql.Timestamp) {
-      ts = (Timestamp) val;
-      if (hfsType == HCatFieldSchema.Type.DATE) {
-        return new Date(ts.getTime());
-      } else if (hfsType == HCatFieldSchema.Type.TIMESTAMP) {
+      ts = sqlToHiveTimestamp((java.sql.Timestamp)val);
+      switch(category) {
+        case DATE:
+          return sqlToHiveDate((java.sql.Timestamp)val);
+        case TIMESTAMP:
+          return ts;
+        case LONG:
+          return ts.toEpochMilli();
+        case STRING:
+          return val.toString();
+        case VARCHAR:
+          VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
+          HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
+          return hvc;
+        case CHAR:
+          CharTypeInfo cti = (CharTypeInfo) typeInfo;
+          HiveChar hc = new HiveChar(val.toString(), cti.getLength());
+          return hc;
+      }
+    }
+    return null;
+  }
+
+  private Object convertStringToPrimitiveTypes(String str, PrimitiveTypeInfo typeInfo) {
+    PrimitiveObjectInspector.PrimitiveCategory category = typeInfo.getPrimitiveCategory();
+    switch (category) {
+      case STRING:
+      case VARCHAR:
+      case CHAR:
+        if (doHiveDelimsReplacement) {
+          str = FieldFormatter.hiveStringReplaceDelims(str,
+                  hiveDelimsReplacement, hiveDelimiters);
+        }
+        if (category == PrimitiveObjectInspector.PrimitiveCategory.STRING) {
+          return str;
+        } else if (category == PrimitiveObjectInspector.PrimitiveCategory.VARCHAR) {
+          VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
+          HiveVarchar hvc = new HiveVarchar(str, vti.getLength());
+          return hvc;
+        } else if (category == PrimitiveObjectInspector.PrimitiveCategory.CHAR) {
+          CharTypeInfo cti = (CharTypeInfo) typeInfo;
+          HiveChar hc = new HiveChar(str, cti.getLength());
+          return hc;
+        }
+        break;
+      case DECIMAL:
+        DecimalTypeInfo dti = (DecimalTypeInfo) typeInfo;
+        BigDecimal bd = new BigDecimal(str, new MathContext(dti.precision(), RoundingMode.HALF_UP));
+        bd.setScale(dti.scale(), BigDecimal.ROUND_HALF_UP);
+        return HiveDecimal.create(bd);
+      case BYTE:
+        Byte b = Byte.valueOf(str);
+        return b;
+      case SHORT:
+        Short s = Short.valueOf(str);
+        return s;
+      case INT:
+        Integer i = Integer.valueOf(str);
+        return i;
+      case LONG:
+        Long l = Long.valueOf(str);
+        return l;
+      case FLOAT:
+        Float f = Float.valueOf(str);
+        return f;
+      case DOUBLE:
+        Double d = Double.valueOf(str);
+        return d;
+      case DATE:
+        Matcher m = numberPattern.matcher(str);
+        Date dt = null;
+        if (m.matches()) {
+          Long l1 = Long.valueOf(str);
+          dt = Date.ofEpochMilli(l1);
+        } else {
+          // treat it as date string
+          dt = Date.valueOf(str);
+        }
+        return dt;
+      case TIMESTAMP:
+        Matcher m2 = numberPattern.matcher(str);
+        Timestamp ts = null;
+        if (m2.matches()) {
+          Long l2 = Long.valueOf(str);
+          ts = Timestamp.ofEpochMilli(l2);
+        } else {
+          // treat it as date string
+          ts = Timestamp.valueOf(str);
+        }
         return ts;
-      } else if (hfsType == HCatFieldSchema.Type.BIGINT) {
-        return ts.getTime();
-      } else if (hfsType == HCatFieldSchema.Type.STRING) {
+      case BOOLEAN:
+        Boolean bool = Boolean.valueOf(str);
+        return bool;
+    }
+    return null;
+  }
+
+  private List<?> convertJSonListToHCatArray(List<?> arrayVals, HCatFieldSchema hfs) {
+    try {
+      HCatSchema arraySchema = hfs.getArrayElementSchema();
+      HCatFieldSchema elementSchema = arraySchema.getFields().get(0);
+      List<Object> result = new ArrayList<Object>();
+      for (Object elemVal : arrayVals) {
+        LOG.debug("Converting " + elemVal + " of type " + elemVal.getClass().getName() + " to " + elementSchema.getTypeString());
+        result.add(toHCat(elemVal, elementSchema));
+      }
+      return result;
+    } catch (Exception e) {
+      LOG.error("Unable to convert [" + arrayVals
+              + "]  of type " + arrayVals.getClass().getName()
+              + " to HCatalog type " + hfs.getTypeString(), e);
+    }
+    return null;
+
+  }
+  private List<?> convertJSonStringToHCatArray(Object obj, HCatFieldSchema hfs) throws IOException {
+    LOG.debug("Converting " + obj + " to " + hfs.getTypeString());
+    List<?> arrayVals = mapper.readValue(obj.toString(), List.class);
+    return convertJSonListToHCatArray(arrayVals, hfs);
+  }
+
+  private Map<?, ?> convertJSonMapToHCatMap(Map<?, ?> mapVals, HCatFieldSchema hfs)  {
+    LOG.debug("Converting " + mapVals + " to " + hfs.getTypeString());
+    try {
+      HCatFieldSchema valueSchema = hfs.getMapValueSchema().getFields().get(0);
+      HashMap<Object, Object> result = new HashMap<Object, Object>();
+
+      for (Map.Entry<?, ?> e : mapVals.entrySet()) {
+        LOG.debug("Converting " + e.getKey() + " of type " + e.getKey().getClass().getName() + " to " + hfs.getTypeString());
+        Object key = toHCat(e.getKey(), new HCatFieldSchema("_col", (PrimitiveTypeInfo) hfs.getMapKeyTypeInfo(), ""));
+        LOG.debug("Converting " + e.getValue() + " of type " + e.getValue().getClass().getName() + " to " + valueSchema.getTypeString());
+        Object val = toHCat(e.getValue(), valueSchema);
+        result.put(key, val);
+      }
+      return result;
+    }
+    catch (Exception e) {
+      LOG.error("Unable to convert [" + mapVals
+              + "]  of type " + mapVals.getClass().getName()
+              + " to HCatalog type " + hfs.getTypeString(), e);
+      LOG.debug(e);
+      return null;
+    }
+  }
+
+  private Map<?, ?> convertJSonStringToHCatMap(Object obj, HCatFieldSchema hfs) throws IOException {
+    LOG.debug("Converting " + obj + " to " + hfs.getTypeString());
+    Map<?, ?> mapVals = mapper.readValue(obj.toString(), Map.class);
+    return convertJSonMapToHCatMap(mapVals, hfs);
+  }
+
+  private List<?> convertJSonListToHCatStruct(List<?> structVals, HCatFieldSchema hfs) {
+    try {
+      HCatSchema structSchema = hfs.getStructSubSchema();
+      List<Object> result = new ArrayList<Object>();
+      if (structVals.size() != structSchema.getFields().size()) {
+        LOG.error("Cannot  convert [" + structVals
+                + "]  of type " + structVals.getClass().getName()
+                + " to HCatalog type " + hfs.getTypeString() + ". Size mismatch");
+      }
+      for (int i = 0; i < structVals.size(); ++i) {
+        LOG.debug("Converting " + structVals.get(i) + " of type " + structVals.get(i).getClass().getName()
+                + " to " + structSchema.getFields().get(i).getTypeString());
+
+        Object val = toHCat(structVals.get(i), structSchema.getFields().get(i));
+
+        result.add(val);
+      }
+      return result;
+    } catch (Exception e) {
+      LOG.error("Unable to convert [" + structVals
+              + "]  of type " + structVals.getClass().getName()
+              + " to HCatalog type " + hfs.getTypeString(), e);
+    }
+    return null;
+  }
+
+  private List<?> convertJSonStringToHCatStruct(Object obj, HCatFieldSchema hfs) throws IOException {
+    LOG.debug("Converting " + obj + " to " + hfs.getTypeString());
+    List<?> structVals = mapper.readValue(obj.toString(), List.class);
+    return convertJSonListToHCatStruct(structVals, hfs);
+  }
+
+  private Object convertBooleanToPrimitiveTypes(Object val, PrimitiveTypeInfo typeInfo) {
+    PrimitiveObjectInspector.PrimitiveCategory category = typeInfo.getPrimitiveCategory();
+    Boolean b = (Boolean) val;
+    switch(category) {
+      case BOOLEAN:
+        return b;
+      case BYTE:
+        return (byte) (b ? 1 : 0);
+      case SHORT:
+        return (short) (b ? 1 : 0);
+      case INT:
+        return (int) (b ? 1 : 0);
+      case LONG:
+        return (long) (b ? 1 : 0);
+      case FLOAT:
+        return (float) (b ? 1 : 0);
+      case DOUBLE:
+        return (double) (b ? 1 : 0);
+      case STRING:
         return val.toString();
-      } else if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-        VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
+      case VARCHAR:
+        VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
         HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
         return hvc;
-      } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-        CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-        HiveChar hc = new HiveChar(val.toString(), cti.getLength());
-        return hc;
-      }
+      case CHAR:
+        CharTypeInfo cti = (CharTypeInfo) typeInfo;
+        HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
+        return hChar;
     }
     return null;
   }
 
-  private Object convertStringTypes(Object val, HCatFieldSchema hfs) {
-    HCatFieldSchema.Type hfsType = hfs.getType();
-    if (isStringType(hfsType)) {
-      String str = val.toString();
-      if (doHiveDelimsReplacement) {
-        str = FieldFormatter.hiveStringReplaceDelims(str,
-          hiveDelimsReplacement, hiveDelimiters);
-      }
-      if (hfsType == HCatFieldSchema.Type.STRING) {
-        return str;
-      } else if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-        VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
-        HiveVarchar hvc = new HiveVarchar(str, vti.getLength());
-        return hvc;
-      } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-        CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-        HiveChar hc = new HiveChar(val.toString(), cti.getLength());
-        return hc;
-      }
-    } else if (hfsType == HCatFieldSchema.Type.DECIMAL) {
-      BigDecimal bd = new BigDecimal(val.toString(), MathContext.DECIMAL128);
-      HiveDecimal hd = HiveDecimal.create(bd);
-      return hd;
-    }
-    return null;
-  }
-
-  private Object convertBooleanTypes(Object val, HCatFieldSchema hfs) {
-    HCatFieldSchema.Type hfsType = hfs.getType();
-    Boolean b = (Boolean) val;
-    if (hfsType == HCatFieldSchema.Type.BOOLEAN) {
-      return b;
-    } else if (hfsType == HCatFieldSchema.Type.TINYINT) {
-      return (byte) (b ? 1 : 0);
-    } else if (hfsType == HCatFieldSchema.Type.SMALLINT) {
-      return (short) (b ? 1 : 0);
-    } else if (hfsType == HCatFieldSchema.Type.INT) {
-      return (int) (b ? 1 : 0);
-    } else if (hfsType == HCatFieldSchema.Type.BIGINT) {
-      return (long) (b ? 1 : 0);
-    } else if (hfsType == HCatFieldSchema.Type.FLOAT) {
-      return (float) (b ? 1 : 0);
-    } else if (hfsType == HCatFieldSchema.Type.DOUBLE) {
-      return (double) (b ? 1 : 0);
-    } else if (hfsType == HCatFieldSchema.Type.STRING) {
-      return val.toString();
-    } else if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-      VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
-      HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
-      return hvc;
-    } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-      CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-      HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
-      return hChar;
-    }
-    return null;
-  }
-
-  private Object convertNumberTypes(Object val, HCatFieldSchema hfs) {
-    HCatFieldSchema.Type hfsType = hfs.getType();
+  private Object convertNumberToPrimitiveTypes(Object val, PrimitiveTypeInfo typeInfo) {
+    PrimitiveObjectInspector.PrimitiveCategory category = typeInfo.getPrimitiveCategory();
 
     if (!(val instanceof Number)) {
       return null;
     }
+
     if (val instanceof BigDecimal
-        && isStringType(hfsType)) {
+        && category == PrimitiveObjectInspector.PrimitiveCategory.STRING
+        || category == PrimitiveObjectInspector.PrimitiveCategory.VARCHAR
+        || category == PrimitiveObjectInspector.PrimitiveCategory.CHAR) {
       BigDecimal bd = (BigDecimal) val;
-      return convertBigDecimalToTextTypes(hfs, hfsType, bd);
+      String bdStr = null;
+      if (bigDecimalFormatString) {
+        bdStr = bd.toPlainString();
+      } else {
+        bdStr = bd.toString();
+      }
+      if (category == PrimitiveObjectInspector.PrimitiveCategory.VARCHAR) {
+        VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
+        HiveVarchar hvc = new HiveVarchar(bdStr, vti.getLength());
+        return hvc;
+      } else if (category == PrimitiveObjectInspector.PrimitiveCategory.CHAR) {
+        CharTypeInfo cti = (CharTypeInfo) typeInfo;
+        HiveChar hChar = new HiveChar(bdStr, cti.getLength());
+        return hChar;
+      } else {
+        return bdStr;
+      }
     }
     Number n = (Number) val;
-    return convertNumberToAnyType(hfs, hfsType, n);
-  }
-
-  private boolean isStringType(HCatFieldSchema.Type hfsType) {
-    return hfsType == HCatFieldSchema.Type.STRING
-        || hfsType == HCatFieldSchema.Type.VARCHAR
-        || hfsType == HCatFieldSchema.Type.CHAR;
-  }
-
-  private Object convertNumberToAnyType(HCatFieldSchema hfs, HCatFieldSchema.Type hfsType, Number number) {
-    if (hfsType == HCatFieldSchema.Type.TINYINT) {
-      return number.byteValue();
-    } else if (hfsType == HCatFieldSchema.Type.SMALLINT) {
-      return number.shortValue();
-    } else if (hfsType == HCatFieldSchema.Type.INT) {
-      return number.intValue();
-    } else if (hfsType == HCatFieldSchema.Type.BIGINT) {
-      return number.longValue();
-    } else if (hfsType == HCatFieldSchema.Type.FLOAT) {
-      return number.floatValue();
-    } else if (hfsType == HCatFieldSchema.Type.DOUBLE) {
-      return number.doubleValue();
-    } else if (hfsType == HCatFieldSchema.Type.BOOLEAN) {
-      return number.byteValue() == 0 ? Boolean.FALSE : Boolean.TRUE;
-    } else if (hfsType == HCatFieldSchema.Type.STRING) {
-      return number.toString();
-    } else if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-      VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
-      HiveVarchar hvc = new HiveVarchar(number.toString(), vti.getLength());
-      return hvc;
-    } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-      CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-      HiveChar hChar = new HiveChar(number.toString(), cti.getLength());
-      return hChar;
-    } else if (hfsType == HCatFieldSchema.Type.DECIMAL) {
-      return convertNumberIntoHiveDecimal(number);
+    switch (category) {
+      case BYTE:
+        return n.byteValue();
+      case SHORT:
+        return n.shortValue();
+      case INT:
+        return n.intValue();
+      case LONG:
+        return n.longValue();
+      case FLOAT:
+        return n.floatValue();
+      case DOUBLE:
+        return n.doubleValue();
+      case BOOLEAN:
+        return n.byteValue() == 0 ? Boolean.FALSE : Boolean.TRUE;
+      case STRING:
+        return n.toString();
+      case VARCHAR:
+        VarcharTypeInfo vti = (VarcharTypeInfo) typeInfo;
+        HiveVarchar hvc = new HiveVarchar(val.toString(), vti.getLength());
+        return hvc;
+      case CHAR:
+        CharTypeInfo cti = (CharTypeInfo) typeInfo;
+        HiveChar hChar = new HiveChar(val.toString(), cti.getLength());
+        return hChar;
+      case DECIMAL:
+        return convertNumberIntoHiveDecimal(n);
     }
     return null;
-  }
-
-  private Object convertBigDecimalToTextTypes(HCatFieldSchema hfs, HCatFieldSchema.Type hfsType, BigDecimal bigDecimal) {
-    String bdStr = null;
-    if (bigDecimalFormatString) {
-      bdStr = bigDecimal.toPlainString();
-    } else {
-      bdStr = bigDecimal.toString();
-    }
-    if (hfsType == HCatFieldSchema.Type.VARCHAR) {
-      VarcharTypeInfo vti = (VarcharTypeInfo) hfs.getTypeInfo();
-      HiveVarchar hvc = new HiveVarchar(bdStr, vti.getLength());
-      return hvc;
-    } else if (hfsType == HCatFieldSchema.Type.CHAR) {
-      CharTypeInfo cti = (CharTypeInfo) hfs.getTypeInfo();
-      HiveChar hChar = new HiveChar(bdStr, cti.getLength());
-      return hChar;
-    } else {
-      return bdStr;
-    }
   }
 
   HiveDecimal convertNumberIntoHiveDecimal(Number number) {

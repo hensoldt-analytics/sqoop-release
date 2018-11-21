@@ -19,6 +19,7 @@
 package org.apache.sqoop.mapreduce;
 
 import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.config.ConfigurationConstants;
 import org.apache.sqoop.config.ConfigurationHelper;
 import org.apache.sqoop.lib.SqoopRecord;
 import org.apache.sqoop.manager.ConnManager;
@@ -451,7 +452,8 @@ public class ExportJobBase extends JobBase {
       if (isHCatJob) {
         // Publish export job data for hcat export operation
         LOG.info("Publishing HCatalog export job data to Listeners");
-        PublishJobData.publishJobData(conf, options, OPERATION, tableName, startTime);
+        String publishClass = conf.get(ConfigurationConstants.DATA_PUBLISH_CLASS);
+        PublishJobData.publishJobData(publishClass, options, OPERATION, tableName, startTime);
       }
 
     } catch (InterruptedException ie) {
