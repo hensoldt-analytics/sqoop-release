@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hive.service.auth.HiveAuthConstants;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.sqoop.authentication.KerberosAuthenticator;
 import org.apache.sqoop.db.JdbcConnectionFactory;
@@ -49,8 +50,8 @@ public class KerberosAuthenticationConfiguration implements AuthenticationConfig
 
     result.put(HiveConf.ConfVars.HIVE_SERVER2_KERBEROS_PRINCIPAL.varname, kerberosConfig.getTestPrincipal());
     result.put(HiveConf.ConfVars.HIVE_SERVER2_KERBEROS_KEYTAB.varname, kerberosConfig.getKeytabFilePath());
-    result.put(HiveConf.ConfVars.HIVE_SERVER2_AUTHENTICATION.varname, HiveAuthFactory.AuthTypes.KERBEROS.toString());
-    result.put(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION, HiveAuthFactory.AuthTypes.KERBEROS.toString());
+    result.put(HiveConf.ConfVars.HIVE_SERVER2_AUTHENTICATION.varname, HiveAuthConstants.AuthTypes.KERBEROS.toString());
+    result.put(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION, HiveAuthConstants.AuthTypes.KERBEROS.toString());
     result.put(YarnConfiguration.RM_PRINCIPAL, kerberosConfig.getTestPrincipal());
 
     return result;

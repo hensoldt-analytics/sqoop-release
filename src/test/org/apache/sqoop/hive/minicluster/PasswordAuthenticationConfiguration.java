@@ -19,6 +19,7 @@
 package org.apache.sqoop.hive.minicluster;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hive.service.auth.HiveAuthConstants;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.auth.PasswdAuthenticationProvider;
 import org.apache.sqoop.db.JdbcConnectionFactory;
@@ -55,7 +56,7 @@ public class PasswordAuthenticationConfiguration implements AuthenticationConfig
   @Override
   public Map<String, String> getAuthenticationConfig() {
     Map<String, String> result = new HashMap<>();
-    result.put(HIVE_SERVER2_AUTHENTICATION.varname, HiveAuthFactory.AuthTypes.CUSTOM.getAuthName());
+    result.put(HIVE_SERVER2_AUTHENTICATION.varname, HiveAuthConstants.AuthTypes.CUSTOM.getAuthName());
     result.put(HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS.varname, TestPasswordAuthenticationProvider.class.getName());
 
     return result;
