@@ -26,6 +26,10 @@ Argument                      Description
 +\--hive-home <dir>+          Override +$HIVE_HOME+
 +\--hive-import+              Import tables into Hive (Uses Hive's \
                               default delimiters if none are set.)
++\--hive-user+                User name for Hive when LDAP authentication\
+                              is used
++\--hive-password+            Password for Hive when LDAP authentication\
+                              is used
 +\--hive-overwrite+           Overwrite existing data in the Hive table.
 +\--create-hive-table+        If set, then the job will fail if the target hive
                               table exists. By default this property is false.

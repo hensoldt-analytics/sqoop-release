@@ -291,16 +291,23 @@ public class HiveImport {
     // run Hive on the script and note the return code.
     String hiveExec = getHiveBinPath();
 
-    String[] argv;
+    List<String> argvs = new ArrayList<String>();
+    argvs.add(hiveExec);
     if (System.getenv("HADOOP_TOKEN_FILE_LOCATION") != null) {
       env.add("HADOOP_TOKEN_FILE_LOCATION=" + System.getenv("HADOOP_TOKEN_FILE_LOCATION"));
-      argv = new String[]{hiveExec, "-a", "delegationToken", "-f", filename};
-    } else {
-      argv = new String[]{hiveExec, "-f", filename};
+      argvs.add("-a");
+      argvs.add("delegationToken");
     }
-
+    if (options.getHiveUser() != null && options.getHivePassword() != null) {
+      argvs.add("-n");
+      argvs.add(options.getHiveUser());
+      argvs.add("-p");
+      argvs.add(options.getHivePassword());
+    }
+    argvs.add("-f");
+    argvs.add(filename);
     LoggingAsyncSink logSink = new LoggingAsyncSink(LOG);
-    int ret = Executor.exec(argv, env.toArray(new String[0]), logSink, logSink);
+    int ret = Executor.exec(argvs.toArray(new String[0]), env.toArray(new String[0]), logSink, logSink);
     if (0 != ret) {
       throw new IOException("Hive exited with status " + ret);
     }

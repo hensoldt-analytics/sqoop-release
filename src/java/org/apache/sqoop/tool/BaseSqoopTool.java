@@ -109,6 +109,8 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
   public static final String FMT_PARQUETFILE_ARG = "as-parquetfile";
   public static final String FMT_ORCFILE_ARG = "as-orcfile";
   public static final String HIVE_IMPORT_ARG = "hive-import";
+  public static final String HIVE_USER_ARG = "hive-user";
+  public static final String HIVE_PASSWORD_ARG = "hive-password";
   public static final String HIVE_TABLE_ARG = "hive-table";
   public static final String HIVE_DATABASE_ARG = "hive-database";
   public static final String HIVE_OVERWRITE_ARG = "hive-overwrite";
@@ -555,6 +557,18 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
           .withLongOpt(HIVE_IMPORT_ARG)
           .create());
     }
+
+    hiveOpts.addOption(OptionBuilder
+            .hasArg()
+            .withDescription("Hive user name")
+            .withLongOpt(HIVE_USER_ARG)
+            .create());
+
+    hiveOpts.addOption(OptionBuilder
+            .hasArg()
+            .withDescription("Hive password")
+            .withLongOpt(HIVE_PASSWORD_ARG)
+            .create());
 
     hiveOpts.addOption(OptionBuilder.withArgName("dir")
         .hasArg().withDescription("Override $HIVE_HOME")
@@ -1208,6 +1222,14 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
 
     if (in.hasOption(HIVE_IMPORT_ARG)) {
       out.setHiveImport(true);
+    }
+
+    if (in.hasOption(HIVE_USER_ARG)) {
+      out.setHiveUser(in.getOptionValue(HIVE_USER_ARG));
+    }
+
+    if (in.hasOption(HIVE_PASSWORD_ARG)) {
+      out.setHivePassword(in.getOptionValue(HIVE_PASSWORD_ARG));
     }
 
     if (in.hasOption(HIVE_OVERWRITE_ARG)) {

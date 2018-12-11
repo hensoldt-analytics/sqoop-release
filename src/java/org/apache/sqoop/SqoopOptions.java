@@ -225,6 +225,8 @@ public class SqoopOptions implements Cloneable {
   private String tmpDir; // where temp data goes; usually /tmp; not serialized.
   private String hiveHome; // not serialized to metastore.
   @StoredAsProperty("hive.import") private boolean hiveImport;
+  @StoredAsProperty("hive.user") private String hiveUser;
+  @StoredAsProperty("hive.password") private String hivePassword;
   @StoredAsProperty("hive.overwrite.table") private boolean overwriteHiveTable;
   @StoredAsProperty("hive.compute.stats.table") private boolean computeStatsHiveTable;
   @StoredAsProperty("hive.fail.table.exists")
@@ -1558,6 +1560,22 @@ public class SqoopOptions implements Cloneable {
 
   public void setHiveImport(boolean doImport) {
     this.hiveImport = doImport;
+  }
+
+  public void setHiveUser(String hiveUser) {
+    this.hiveUser = hiveUser;
+  }
+
+  public void setHivePassword(String hivePassword) {
+    this.hivePassword = hivePassword;
+  }
+
+  public String getHiveUser() {
+    return this.hiveUser;
+  }
+
+  public String getHivePassword() {
+    return this.hivePassword;
   }
 
   public String getHiveExternalTableDir() {
