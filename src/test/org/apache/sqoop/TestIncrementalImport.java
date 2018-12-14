@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.sqoop.metastore.SavedJobsTestBase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -44,6 +45,7 @@ import org.apache.sqoop.manager.ConnManager;
 import org.apache.sqoop.manager.HsqldbManager;
 import org.apache.sqoop.manager.ManagerFactory;
 import org.apache.sqoop.metastore.JobData;
+import org.apache.sqoop.testcategories.sqooptest.IntegrationTest;
 import org.apache.sqoop.testutil.BaseSqoopTestCase;
 import org.apache.sqoop.testutil.CommonArgs;
 import org.apache.sqoop.tool.ImportTool;
@@ -52,6 +54,7 @@ import org.apache.sqoop.metastore.AutoGenericJobStorage;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
 
 
@@ -64,7 +67,7 @@ import static org.junit.Assert.*;
  * The metastore URL is configured to be in-memory, and drop all
  * state between individual tests.
  */
-
+@Category(IntegrationTest.class)
 public class TestIncrementalImport  {
 
   public static final Log LOG = LogFactory.getLog(
@@ -85,6 +88,7 @@ public class TestIncrementalImport  {
 
   public static void resetSourceDataSchema() throws SQLException {
     SqoopOptions options = new SqoopOptions();
+    SqoopOptions.clearNonceDir();
     options.setConnectString(SOURCE_DB_URL);
     options.setUsername(AUTO_STORAGE_USERNAME);
     options.setPassword(AUTO_STORAGE_PASSWORD);
@@ -275,18 +279,33 @@ public class TestIncrementalImport  {
     }
   }
 
+  private Path getTablePath(String tableName) {
+    Path warehouse = new Path(BaseSqoopTestCase.getLocalWarehouseDir());
+    return new Path(warehouse, tableName);
+  }
+
+  private FileSystem getLocalFileSystem() throws IOException {
+    return FileSystem.getLocal(new Configuration());
+  }
+
   /**
    * Delete all files in a directory for a table.
    */
   public void clearDir(String tableName) {
     try {
-      FileSystem fs = FileSystem.getLocal(new Configuration());
-      Path warehouse = new Path(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
-      Path tableDir = new Path(warehouse, tableName);
+      FileSystem fs = getLocalFileSystem();
+      Path tableDir = getTablePath(tableName);
       fs.delete(tableDir, true);
     } catch (Exception e) {
       fail("Got unexpected exception: " + StringUtils.stringifyException(e));
     }
+  }
+
+  public void createDir(String tableName) throws IOException {
+    FileSystem fs = FileSystem.getLocal(new Configuration());
+    Path warehouse = new Path(BaseSqoopTestCase.getLocalWarehouseDir());
+    Path tableDir = new Path(warehouse, tableName);
+    fs.mkdirs(tableDir);
   }
 
   /**
@@ -297,7 +316,7 @@ public class TestIncrementalImport  {
   public void assertDirOfNumbers(String tableName, int expectedNums) {
     try {
       FileSystem fs = FileSystem.getLocal(new Configuration());
-      Path warehouse = new Path(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+      Path warehouse = new Path(BaseSqoopTestCase.getLocalWarehouseDir());
       Path tableDir = new Path(warehouse, tableName);
       FileStatus [] stats = fs.listStatus(tableDir);
       String [] fileNames = new String[stats.length];
@@ -349,7 +368,7 @@ public class TestIncrementalImport  {
   public void assertDirOfNumbersAndTimestamps(String tableName, int expectedNums) {
     try {
       FileSystem fs = FileSystem.getLocal(new Configuration());
-      Path warehouse = new Path(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+      Path warehouse = new Path(BaseSqoopTestCase.getLocalWarehouseDir());
       Path tableDir = new Path(warehouse, tableName);
       FileStatus [] stats = fs.listStatus(tableDir);
       String [] fileNames = new String[stats.length];
@@ -400,7 +419,7 @@ public class TestIncrementalImport  {
   public void assertFirstSpecificNumber(String tableName, int val) {
     try {
       FileSystem fs = FileSystem.getLocal(new Configuration());
-      Path warehouse = new Path(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+      Path warehouse = new Path(BaseSqoopTestCase.getLocalWarehouseDir());
       Path tableDir = new Path(warehouse, tableName);
       FileStatus [] stats = fs.listStatus(tableDir);
       String [] filePaths = new String[stats.length];
@@ -453,7 +472,7 @@ public class TestIncrementalImport  {
   public void assertSpecificNumber(String tableName, int val) {
     try {
       FileSystem fs = FileSystem.getLocal(new Configuration());
-      Path warehouse = new Path(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+      Path warehouse = new Path(BaseSqoopTestCase.getLocalWarehouseDir());
       Path tableDir = new Path(warehouse, tableName);
       FileStatus [] stats = fs.listStatus(tableDir);
       String [] filePaths = new String[stats.length];
@@ -527,7 +546,7 @@ public class TestIncrementalImport  {
     args.add("--table");
     args.add(tableName);
     args.add("--warehouse-dir");
-    args.add(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+    args.add(BaseSqoopTestCase.getLocalWarehouseDir());
     if (isAppend) {
       args.add("--incremental");
       args.add("append");
@@ -573,7 +592,7 @@ public class TestIncrementalImport  {
     args.add("--class-name");
     args.add(className);
     args.add("--target-dir");
-    args.add(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR
+    args.add(BaseSqoopTestCase.getLocalWarehouseDir()
       + System.getProperty("file.separator") + directoryName);
     if (isAppend) {
       args.add("--incremental");
@@ -837,6 +856,25 @@ public class TestIncrementalImport  {
     runImport(options, args);
 
     assertDirOfNumbers(TABLE_NAME, 10);
+  }
+
+  @Test
+  public void testLastModifiedImportWithExistingOutputDirectoryFails() throws Exception {
+    final String TABLE_NAME = "failWithExistingOutputDirectory";
+
+    createDir(TABLE_NAME);
+
+    Timestamp thePast = new Timestamp(System.currentTimeMillis() - 100);
+    createTimestampTable(TABLE_NAME, 10, thePast);
+
+    List<String> args = getArgListForTable(TABLE_NAME, true, false);
+
+    SqoopOptions options = new SqoopOptions(newConf());
+    options.setThrowOnError(true);
+
+    thrown.expectMessage("--merge-key or --append is required when using --incremental lastmodified and the output directory exists.");
+    Sqoop sqoop = new Sqoop(new ImportTool(), options.getConf(), options);
+    ToolRunner.run(sqoop.getConf(), sqoop, args.toArray(new String[0]));
   }
 
   @Test
@@ -1284,7 +1322,7 @@ public class TestIncrementalImport  {
 		args.add("--table");
 		args.add(TABLE_NAME);
 		args.add("--warehouse-dir");
-		args.add(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+		args.add(BaseSqoopTestCase.getLocalWarehouseDir());
 		args.add("--hive-import");
 		args.add("--hive-table");
 		args.add(TABLE_NAME + "hive");

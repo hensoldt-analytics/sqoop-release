@@ -23,6 +23,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.net.PrintCommandListener;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
@@ -85,8 +86,14 @@ public final class MainframeFTPClientUtils {
         ftp.changeWorkingDirectory("'" + pdsName + "'");
         FTPFile[] ftpFiles = null;
         if (!MainframeConfiguration.MAINFRAME_INPUT_DATASET_TYPE_PARTITIONED.equals(dsType)) {
-          // excepting partitioned datasets, use the MainframeFTPFileEntryParser, default doesn't match larger datasets
-        	FTPListParseEngine parser = ftp.initiateListParsing(MainframeConfiguration.MAINFRAME_FTP_FILE_ENTRY_PARSER_CLASSNAME, "");
+          FTPListParseEngine parser = null;
+          if (MainframeConfiguration.MAINFRAME_INPUT_DATASET_TYPE_GDG.equals(dsType)) {
+            // use GDG specific parser to filter out non GDG datasets
+            parser = ftp.initiateListParsing(MainframeConfiguration.MAINFRAME_FTP_FILE_GDG_ENTRY_PARSER_CLASSNAME, "");
+          } else {
+            // excepting partitioned datasets, use the MainframeFTPFileEntryParser, default doesn't match larger datasets
+            parser = ftp.initiateListParsing(MainframeConfiguration.MAINFRAME_FTP_FILE_ENTRY_PARSER_CLASSNAME, "");
+          }
         	List<FTPFile> listing = new ArrayList<FTPFile>();
         	while(parser.hasNext()) {
         		FTPFile[] files = parser.getNext(25);
@@ -207,8 +214,18 @@ public final class MainframeFTPClientUtils {
         throw new IOException("Could not login to server " + server
             + ":" + ftp.getReplyString());
       }
-      // set ASCII transfer mode
-      ftp.setFileType(FTP.ASCII_FILE_TYPE);
+      // set transfer mode
+      String transferMode = conf.get(MainframeConfiguration.MAINFRAME_FTP_TRANSFER_MODE);
+      if (StringUtils.equalsIgnoreCase(MainframeConfiguration.MAINFRAME_FTP_TRANSFER_MODE_BINARY,transferMode)) {
+        LOG.info("Setting FTP transfer mode to binary");
+        // ftp.setFileTransferMode(FTP.BINARY_FILE_TYPE) doesn't work for MVS, it throws a syntax error
+        ftp.sendCommand("TYPE I");
+        // this is IMPORTANT - otherwise it will convert 0x0d0a to 0x0a = dropping bytes
+        ftp.setFileType(FTP.BINARY_FILE_TYPE);
+      } else {
+        LOG.info("Defaulting FTP transfer mode to ascii");
+        ftp.setFileTransferMode(FTP.ASCII_FILE_TYPE);
+      }
       // Use passive mode as default.
       ftp.enterLocalPassiveMode();
       LOG.info("System type detected: " + ftp.getSystemType());

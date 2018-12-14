@@ -18,6 +18,7 @@
 
 package org.apache.sqoop;
 
+import org.apache.avro.util.Utf8;
 import org.apache.sqoop.testutil.CommonArgs;
 import org.apache.sqoop.testutil.HsqldbTestServer;
 import org.apache.sqoop.testutil.ImportJobTestCase;
@@ -28,11 +29,8 @@ import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.sqoop.util.ParquetReader;
 import org.junit.Test;
-import org.kitesdk.data.CompressionType;
-import org.kitesdk.data.Dataset;
-import org.kitesdk.data.DatasetReader;
-import org.kitesdk.data.Datasets;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -41,8 +39,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.apache.sqoop.avro.AvroUtil.getAvroSchemaFromParquetFile;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -118,11 +116,25 @@ public class TestParquetImport extends ImportJobTestCase {
   }
 
   @Test
+  public void testGzipCompression() throws IOException {
+    runParquetImportTest("gzip");
+  }
+
+  /**
+   * This test case is added to document that the deflate codec is not supported with
+   * the Hadoop Parquet implementation so Sqoop throws an exception when it is specified.
+   * @throws IOException
+   */
+  @Test(expected = IOException.class)
   public void testDeflateCompression() throws IOException {
     runParquetImportTest("deflate");
   }
 
   private void runParquetImportTest(String codec) throws IOException {
+    runParquetImportTest(codec, codec);
+  }
+
+  private void runParquetImportTest(String codec, String expectedCodec) throws IOException {
     String[] types = {"BIT", "INTEGER", "BIGINT", "REAL", "DOUBLE", "VARCHAR(6)",
         "VARBINARY(2)",};
     String[] vals = {"true", "100", "200", "1.0", "2.0", "'s'", "'0102'", };
@@ -131,9 +143,10 @@ public class TestParquetImport extends ImportJobTestCase {
     String [] extraArgs = { "--compression-codec", codec};
     runImport(getOutputArgv(true, extraArgs));
 
-    assertEquals(CompressionType.forName(codec), getCompressionType());
+    ParquetReader parquetReader = new ParquetReader(getTablePath());
+    assertEquals(expectedCodec.toUpperCase(), parquetReader.getCodec().name());
 
-    Schema schema = getSchema();
+    Schema schema = getAvroSchemaFromParquetFile(getTablePath(), getConf());
     assertEquals(Type.RECORD, schema.getType());
     List<Field> fields = schema.getFields();
     assertEquals(types.length, fields.size());
@@ -145,25 +158,21 @@ public class TestParquetImport extends ImportJobTestCase {
     checkField(fields.get(5), "DATA_COL5", Type.STRING);
     checkField(fields.get(6), "DATA_COL6", Type.BYTES);
 
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      GenericRecord record1 = reader.next();
-      assertNotNull(record1);
-      assertEquals("DATA_COL0", true, record1.get("DATA_COL0"));
-      assertEquals("DATA_COL1", 100, record1.get("DATA_COL1"));
-      assertEquals("DATA_COL2", 200L, record1.get("DATA_COL2"));
-      assertEquals("DATA_COL3", 1.0f, record1.get("DATA_COL3"));
-      assertEquals("DATA_COL4", 2.0, record1.get("DATA_COL4"));
-      assertEquals("DATA_COL5", "s", record1.get("DATA_COL5"));
-      Object object = record1.get("DATA_COL6");
-      assertTrue(object instanceof ByteBuffer);
-      ByteBuffer b = ((ByteBuffer) object);
-      assertEquals((byte) 1, b.get(0));
-      assertEquals((byte) 2, b.get(1));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
+    List<GenericRecord> genericRecords = parquetReader.readAll();
+    GenericRecord record1 = genericRecords.get(0);
+    assertNotNull(record1);
+    assertEquals("DATA_COL0", true, record1.get("DATA_COL0"));
+    assertEquals("DATA_COL1", 100, record1.get("DATA_COL1"));
+    assertEquals("DATA_COL2", 200L, record1.get("DATA_COL2"));
+    assertEquals("DATA_COL3", 1.0f, record1.get("DATA_COL3"));
+    assertEquals("DATA_COL4", 2.0, record1.get("DATA_COL4"));
+    assertEquals("DATA_COL5", new Utf8("s"), record1.get("DATA_COL5"));
+    Object object = record1.get("DATA_COL6");
+    assertTrue(object instanceof ByteBuffer);
+    ByteBuffer b = ((ByteBuffer) object);
+    assertEquals((byte) 1, b.get(0));
+    assertEquals((byte) 2, b.get(1));
+    assertEquals(1, genericRecords.size());
   }
 
   @Test
@@ -175,21 +184,16 @@ public class TestParquetImport extends ImportJobTestCase {
     String [] extraArgs = { "--map-column-java", "DATA_COL0=String"};
     runImport(getOutputArgv(true, extraArgs));
 
-    Schema schema = getSchema();
+    Schema schema = getAvroSchemaFromParquetFile(getTablePath(), getConf());
     assertEquals(Type.RECORD, schema.getType());
     List<Field> fields = schema.getFields();
     assertEquals(types.length, fields.size());
     checkField(fields.get(0), "DATA_COL0", Type.STRING);
 
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      assertTrue(reader.hasNext());
-      GenericRecord record1 = reader.next();
-      assertEquals("DATA_COL0", "10", record1.get("DATA_COL0"));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
+    List<GenericRecord> genericRecords = new ParquetReader(getTablePath()).readAll();
+    GenericRecord record1 = genericRecords.get(0);
+    assertEquals("DATA_COL0", new Utf8("10"), record1.get("DATA_COL0"));
+    assertEquals(1, genericRecords.size());
   }
 
   @Test
@@ -201,21 +205,16 @@ public class TestParquetImport extends ImportJobTestCase {
 
     runImport(getOutputArgv(true, null));
 
-    Schema schema = getSchema();
+    Schema schema = getAvroSchemaFromParquetFile(getTablePath(), getConf());
     assertEquals(Type.RECORD, schema.getType());
     List<Field> fields = schema.getFields();
     assertEquals(types.length, fields.size());
     checkField(fields.get(0), "__NAME", Type.INT);
 
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      assertTrue(reader.hasNext());
-      GenericRecord record1 = reader.next();
-      assertEquals("__NAME", 1987, record1.get("__NAME"));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
+    List<GenericRecord> genericRecords = new ParquetReader(getTablePath()).readAll();
+    GenericRecord record1 = genericRecords.get(0);
+    assertEquals("__NAME", 1987, record1.get("__NAME"));
+    assertEquals(1, genericRecords.size());
   }
 
   @Test
@@ -227,21 +226,16 @@ public class TestParquetImport extends ImportJobTestCase {
 
     runImport(getOutputArgv(true, null));
 
-    Schema schema = getSchema();
+    Schema schema = getAvroSchemaFromParquetFile(getTablePath(), getConf());
     assertEquals(Type.RECORD, schema.getType());
     List<Field> fields = schema.getFields();
     assertEquals(types.length, fields.size());
     checkField(fields.get(0), "TEST_P_A_R_QUET", Type.INT);
 
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      assertTrue(reader.hasNext());
-      GenericRecord record1 = reader.next();
-      assertEquals("TEST_P_A_R_QUET", 2015, record1.get("TEST_P_A_R_QUET"));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
+    List<GenericRecord> genericRecords = new ParquetReader(getTablePath()).readAll();
+    GenericRecord record1 = genericRecords.get(0);
+    assertEquals("TEST_P_A_R_QUET", 2015, record1.get("TEST_P_A_R_QUET"));
+    assertEquals(1, genericRecords.size());
   }
 
   @Test
@@ -252,15 +246,10 @@ public class TestParquetImport extends ImportJobTestCase {
 
     runImport(getOutputArgv(true, null));
 
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      assertTrue(reader.hasNext());
-      GenericRecord record1 = reader.next();
-      assertNull(record1.get("DATA_COL0"));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
+    List<GenericRecord> genericRecords = new ParquetReader(getTablePath()).readAll();
+    GenericRecord record1 = genericRecords.get(0);
+    assertNull(record1.get("DATA_COL0"));
+    assertEquals(1, genericRecords.size());
   }
 
   @Test
@@ -271,15 +260,10 @@ public class TestParquetImport extends ImportJobTestCase {
 
     runImport(getOutputQueryArgv(true, null));
 
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      assertTrue(reader.hasNext());
-      GenericRecord record1 = reader.next();
-      assertEquals(1, record1.get("DATA_COL0"));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
+    List<GenericRecord> genericRecords = new ParquetReader(getTablePath()).readAll();
+    GenericRecord record1 = genericRecords.get(0);
+    assertEquals(1, record1.get("DATA_COL0"));
+    assertEquals(1, genericRecords.size());
   }
 
   @Test
@@ -291,17 +275,12 @@ public class TestParquetImport extends ImportJobTestCase {
     runImport(getOutputArgv(true, null));
     runImport(getOutputArgv(true, new String[]{"--append"}));
 
-    DatasetReader<GenericRecord> reader = getReader();
-    try {
-      assertTrue(reader.hasNext());
-      GenericRecord record1 = reader.next();
-      assertEquals(1, record1.get("DATA_COL0"));
-      record1 = reader.next();
-      assertEquals(1, record1.get("DATA_COL0"));
-      assertFalse(reader.hasNext());
-    } finally {
-      reader.close();
-    }
+    List<GenericRecord> genericRecords = new ParquetReader(getTablePath()).readAll();
+    GenericRecord record1 = genericRecords.get(0);
+    assertEquals(1, record1.get("DATA_COL0"));
+    record1 = genericRecords.get(1);
+    assertEquals(1, record1.get("DATA_COL0"));
+    assertEquals(2, genericRecords.size());
   }
 
   @Test
@@ -319,37 +298,10 @@ public class TestParquetImport extends ImportJobTestCase {
     }
   }
 
-  private CompressionType getCompressionType() {
-    return getDataset().getDescriptor().getCompressionType();
-  }
-
-  private Schema getSchema() {
-    return getDataset().getDescriptor().getSchema();
-  }
-
-  private DatasetReader<GenericRecord> getReader() {
-    return getDataset().newReader();
-  }
-
-  private Dataset<GenericRecord> getDataset() {
-    String uri = "dataset:file:" + getTablePath();
-    return Datasets.load(uri, GenericRecord.class);
-  }
-
-  @Override
-  public void tearDown() {
-    super.tearDown();
-    String uri = "dataset:file:" + getTablePath();
-    if (Datasets.exists(uri)) {
-      Datasets.delete(uri);
-    }
-  }
-
   private void checkField(Field field, String name, Type type) {
     assertEquals(name, field.name());
     assertEquals(Type.UNION, field.schema().getType());
     assertEquals(Type.NULL, field.schema().getTypes().get(0).getType());
     assertEquals(type, field.schema().getTypes().get(1).getType());
   }
-
 }

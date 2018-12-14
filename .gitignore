@@ -36,3 +36,8 @@ target
 /conf/managers.d
 /conf/tools.d
 /tags
+src/java/org/apache/sqoop/SqoopVersion.java
+gradle/build
+gradle/.gradle
+.gradle
+out

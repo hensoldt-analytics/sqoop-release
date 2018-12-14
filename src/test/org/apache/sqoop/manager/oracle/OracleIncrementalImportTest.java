@@ -20,6 +20,7 @@ package org.apache.sqoop.manager.oracle;
 
 import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.manager.oracle.util.OracleUtils;
+import org.apache.sqoop.testcategories.thirdpartytest.OracleTest;
 import org.apache.sqoop.testutil.CommonArgs;
 import org.apache.sqoop.testutil.ImportJobTestCase;
 import org.apache.commons.logging.Log;
@@ -31,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.After;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -49,6 +51,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * Test free form query import with the Oracle db.
  */
+@Category(OracleTest.class)
 public class OracleIncrementalImportTest extends ImportJobTestCase {
 
   public static final Log LOG = LogFactory.getLog(
@@ -109,7 +112,7 @@ public class OracleIncrementalImportTest extends ImportJobTestCase {
     args.add("--connect");
     args.add(getConnectString());
     args.add("--target-dir");
-    args.add(getWarehouseDir());
+    args.add(getTablePath().toString());
     args.add("--num-mappers");
     args.add("1");
     args.add("--split-by");
@@ -153,8 +156,7 @@ public class OracleIncrementalImportTest extends ImportJobTestCase {
     String[] args = getArgv(tableName, connPropsFileName, getColName(2));
     runImport(args);
 
-    Path warehousePath = new Path(this.getWarehouseDir());
-    Path filePath = new Path(warehousePath, "part-m-00000");
+    Path filePath = new Path(getTablePath().toString(), "part-m-00000");
     String output = readLineFromPath(filePath);
     String expectedVal = "2,new_data,2000-11-11";
     assertEquals("Incremental import result expected a different string",
@@ -181,8 +183,7 @@ public class OracleIncrementalImportTest extends ImportJobTestCase {
     String[] args = getArgv(tableName, connPropsFileName, getColName(2));
     runImport(args);
 
-    Path warehousePath = new Path(this.getWarehouseDir());
-    Path filePath = new Path(warehousePath, "part-m-00000");
+    Path filePath = new Path(getTablePath(), "part-m-00000");
     String output = readLineFromPath(filePath);
     String expectedVal = "2,new_data,2000-11-11 23:23:23.0";
     assertEquals("Incremental import result expected a different string",

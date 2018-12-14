@@ -285,6 +285,7 @@ public class JobBase {
    */
   protected void loadJars(Configuration conf, String ormJarFile,
       String tableClassName) throws IOException {
+
     if (ConfigurationHelper.isLocalJobTracker(conf)) {
       // If we're using the LocalJobRunner, then instead of using the compiled
       // jar file as the job source, we're running in the current thread. Push

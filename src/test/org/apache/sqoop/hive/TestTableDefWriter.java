@@ -23,34 +23,74 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.sqoop.manager.ConnManager;
+import org.apache.sqoop.testcategories.sqooptest.UnitTest;
 import org.apache.sqoop.util.SqlTypeMap;
 
 import org.apache.sqoop.SqoopOptions;
-import org.apache.sqoop.tool.ImportTool;
 import org.apache.sqoop.testutil.HsqldbTestServer;
 
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
 
 import java.sql.Types;
 
+import static org.apache.sqoop.SqoopOptions.FileLayout.OrcFile;
+import static org.apache.sqoop.SqoopOptions.FileLayout.ParquetFile;
+import static org.apache.sqoop.mapreduce.parquet.ParquetConstants.SQOOP_PARQUET_AVRO_SCHEMA_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 
 /**
  * Test Hive DDL statement generation.
  */
+@Category(UnitTest.class)
 public class TestTableDefWriter {
+
+  private static final String TEST_AVRO_SCHEMA = "{\"type\":\"record\",\"name\":\"IMPORT_TABLE_1\",\"fields\":[{\"name\":\"C1_VARCHAR\",\"type\":[\"null\",\"string\"]},{\"name\":\"C2_INTEGER\",\"type\":[\"null\",\"int\"]},{\"name\":\"_3C_CHAR\",\"type\":[\"null\",\"string\"]}]}";
+
+  private static final String EXPECTED_CREATE_PARQUET_TABLE_STMNT = "CREATE TABLE IF NOT EXISTS `outputTable` ( `C1_VARCHAR` STRING, `C2_INTEGER` INT, `_3C_CHAR` STRING) STORED AS PARQUET";
 
   public static final Log LOG = LogFactory.getLog(
       TestTableDefWriter.class.getName());
 
+  private ConnManager connManager;
+
+  private Configuration conf;
+
+  private SqoopOptions options;
+
+  private TableDefWriter writer;
+
+  private String inputTable;
+
+  private String outputTable;
+
   @Rule
   public ExpectedException thrown = ExpectedException.none();
+
+  @Before
+  public void before() {
+    inputTable = HsqldbTestServer.getTableName();
+    outputTable = "outputTable";
+    connManager = mock(ConnManager.class);
+    conf = new Configuration();
+    options = new SqoopOptions();
+    when(connManager.getColumnTypes(anyString())).thenReturn(new SqlTypeMap<String, Integer>());
+    when(connManager.getColumnNames(anyString())).thenReturn(new String[]{});
+
+    writer = new TableDefWriter(options, connManager, inputTable, outputTable, conf, false);
+  }
 
   // Test getHiveOctalCharCode and expect an IllegalArgumentException.
   private void expectExceptionInCharCode(int charCode) {
@@ -73,14 +113,6 @@ public class TestTableDefWriter {
 
   @Test
   public void testDifferentTableNames() throws Exception {
-    Configuration conf = new Configuration();
-    SqoopOptions options = new SqoopOptions();
-    TableDefWriter writer = new TableDefWriter(options, null,
-        "inputTable", "outputTable", conf, false);
-
-    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
-    writer.setColumnTypes(colTypes);
-
     String createTable = writer.getCreateTableStmt();
     String loadData = writer.getLoadDataStmt();
 
@@ -91,24 +123,15 @@ public class TestTableDefWriter {
     assertTrue(createTable.indexOf(
         "CREATE TABLE IF NOT EXISTS `outputTable`") != -1);
     assertTrue(loadData.indexOf("INTO TABLE `outputTable`") != -1);
-    assertTrue(loadData.indexOf("/inputTable'") != -1);
+    assertTrue(loadData.indexOf("/" + inputTable + "'") != -1);
   }
 
   @Test
   public void testDifferentTargetDirs() throws Exception {
     String targetDir = "targetDir";
-    String inputTable = "inputTable";
-    String outputTable = "outputTable";
 
-    Configuration conf = new Configuration();
-    SqoopOptions options = new SqoopOptions();
     // Specify a different target dir from input table name
     options.setTargetDir(targetDir);
-    TableDefWriter writer = new TableDefWriter(options, null,
-        inputTable, outputTable, conf, false);
-
-    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
-    writer.setColumnTypes(colTypes);
 
     String createTable = writer.getCreateTableStmt();
     String loadData = writer.getLoadDataStmt();
@@ -125,18 +148,8 @@ public class TestTableDefWriter {
 
   @Test
   public void testPartitions() throws Exception {
-    String[] args = {
-        "--hive-partition-key", "ds",
-        "--hive-partition-value", "20110413",
-    };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-      new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, "inputTable", "outputTable", conf, false);
-
-    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
-    writer.setColumnTypes(colTypes);
+    options.setHivePartitionKey("ds");
+    options.setHivePartitionValue("20110413");
 
     String createTable = writer.getCreateTableStmt();
     String loadData = writer.getLoadDataStmt();
@@ -152,18 +165,8 @@ public class TestTableDefWriter {
 
   @Test
   public void testLzoSplitting() throws Exception {
-    String[] args = {
-        "--compress",
-        "--compression-codec", "lzop",
-    };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-      new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, "inputTable", "outputTable", conf, false);
-
-    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
-    writer.setColumnTypes(colTypes);
+    options.setUseCompression(true);
+    options.setCompressionCodec("lzop");
 
     String createTable = writer.getCreateTableStmt();
     String loadData = writer.getLoadDataStmt();
@@ -181,19 +184,13 @@ public class TestTableDefWriter {
 
   @Test
   public void testUserMappingNoDecimal() throws Exception {
-    String[] args = {
-        "--map-column-hive", "id=STRING,value=INTEGER",
-    };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-      new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
+    options.setMapColumnHive("id=STRING,value=INTEGER");
 
     Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
     colTypes.put("id", Types.INTEGER);
     colTypes.put("value", Types.VARCHAR);
-    writer.setColumnTypes(colTypes);
+
+    setUpMockConnManager(HsqldbTestServer.getTableName(), colTypes);
 
     String createTable = writer.getCreateTableStmt();
 
@@ -208,15 +205,7 @@ public class TestTableDefWriter {
 
   @Test
   public void testUserMappingWithDecimal() throws Exception {
-    String[] args = {
-        "--map-column-hive", "id=STRING,value2=DECIMAL(13,5),value1=INTEGER," +
-                             "value3=DECIMAL(4,5),value4=VARCHAR(255)",
-    };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-        new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
+    options.setMapColumnHive("id=STRING,value2=DECIMAL(13,5),value1=INTEGER,value3=DECIMAL(4,5),value4=VARCHAR(255)");
 
     Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
     colTypes.put("id", Types.INTEGER);
@@ -224,7 +213,8 @@ public class TestTableDefWriter {
     colTypes.put("value2", Types.DOUBLE);
     colTypes.put("value3", Types.FLOAT);
     colTypes.put("value4", Types.CHAR);
-    writer.setColumnTypes(colTypes);
+
+    setUpMockConnManager(HsqldbTestServer.getTableName(), colTypes);
 
     String createTable = writer.getCreateTableStmt();
 
@@ -245,37 +235,20 @@ public class TestTableDefWriter {
 
   @Test
   public void testUserMappingFailWhenCantBeApplied() throws Exception {
-    String[] args = {
-        "--map-column-hive", "id=STRING,value=INTEGER",
-    };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-      new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
+    options.setMapColumnHive("id=STRING,value=INTEGER");
 
     Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
     colTypes.put("id", Types.INTEGER);
-    writer.setColumnTypes(colTypes);
+    setUpMockConnManager(HsqldbTestServer.getTableName(), colTypes);
 
     thrown.expect(IllegalArgumentException.class);
     thrown.reportMissingExceptionWithMessage("Expected IllegalArgumentException on non applied Hive type mapping");
-    String createTable = writer.getCreateTableStmt();
+    writer.getCreateTableStmt();
   }
 
   @Test
   public void testHiveDatabase() throws Exception {
-    String[] args = {
-        "--hive-database", "db",
-    };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-      new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
-
-    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
-    writer.setColumnTypes(colTypes);
+    options.setHiveDatabaseName("db");
 
     String createTable = writer.getCreateTableStmt();
     assertNotNull(createTable);
@@ -287,20 +260,29 @@ public class TestTableDefWriter {
   }
 
   @Test
-  public void testHiveComputeStats() throws Exception {
-    String[] args = {
-      "--hive-database",
-      "db",
-      "--hive-compute-stats",
-    };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-      new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
+  public void testGetCreateTableStmtDiscardsConnection() throws Exception {
+    writer.getCreateTableStmt();
 
-    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
-    writer.setColumnTypes(colTypes);
+    verify(connManager).discardConnection(true);
+  }
+
+  @Test
+  public void testGetCreateTableStmtWithAvroSchema() throws Exception {
+    options.setFileLayout(ParquetFile);
+    options.getConf().set(SQOOP_PARQUET_AVRO_SCHEMA_KEY, TEST_AVRO_SCHEMA);
+
+    assertEquals(EXPECTED_CREATE_PARQUET_TABLE_STMNT, writer.getCreateTableStmt());
+  }
+
+  private void setUpMockConnManager(String tableName, Map<String, Integer> typeMap) {
+    when(connManager.getColumnTypes(tableName)).thenReturn(typeMap);
+    when(connManager.getColumnNames(tableName)).thenReturn(typeMap.keySet().toArray(new String[]{}));
+  }
+
+  @Test
+  public void testHiveComputeStats() throws Exception {
+    options.setHiveDatabaseName("db");
+    options.setComputeStatsHiveTable(true);
 
     String createTable = writer.getCreateTableStmt();
     assertNotNull(createTable);
@@ -324,15 +306,7 @@ public class TestTableDefWriter {
    */
   @Test
   public void testOrcFormatInCreateStatement() throws Exception {
-    String[] args = { "--as-orcfile" };
-    Configuration conf = new Configuration();
-    SqoopOptions options =
-        new ImportTool().parseArguments(args, null, null, false);
-    TableDefWriter writer = new TableDefWriter(options,
-        null, HsqldbTestServer.getTableName(), "outputTable", conf, false);
-
-    Map<String, Integer> colTypes = new SqlTypeMap<String, Integer>();
-    writer.setColumnTypes(colTypes);
+    options.setFileLayout(OrcFile);
 
     String createTable = writer.getCreateTableStmt();
     assertNotNull(createTable);

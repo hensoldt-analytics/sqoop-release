@@ -25,6 +25,8 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.mapred.FsInput;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
@@ -36,6 +38,11 @@ import static org.junit.Assert.fail;
 import static org.junit.Assert.assertEquals;
 
 public class AvroTestUtils {
+
+  private static final String OUTPUT_FILE_NAME = "part-m-00000.avro";
+
+  public static final Log LOG = LogFactory.getLog(
+          AvroTestUtils.class.getName());
 
   public static List<String[]> getInputData() {
     List<String[]> data = new ArrayList<>();
@@ -63,21 +70,37 @@ public class AvroTestUtils {
         .withOption("table", testCase.getTableName());
   }
 
-  public static void verify(String[] expectedResults, Configuration conf, Path tablePath) {
-    Path outputFile = new Path(tablePath, "part-m-00000.avro");
+  public static void registerDecimalConversionUsageForVerification() {
     GenericData.get().addLogicalTypeConversion(new Conversions.DecimalConversion());
+  }
+
+  public static void verify(String[] expectedResults, Configuration conf, Path tablePath) {
+    Path outputFile = new Path(tablePath, OUTPUT_FILE_NAME);
+    readAndVerify(expectedResults, conf, outputFile);
+  }
+
+  public static void verify(String[] expectedResults, Configuration conf, Path tablePath, String outputFileName) {
+    Path outputFile = new Path(tablePath, outputFileName + ".avro");
+    readAndVerify(expectedResults, conf, outputFile);
+  }
+
+  private static void readAndVerify(String[] expectedResults, Configuration conf, Path outputFile) {
     try (DataFileReader<GenericRecord> reader = read(outputFile, conf)) {
       GenericRecord record;
       if (!reader.hasNext() && expectedResults != null && expectedResults.length > 0) {
-        fail("empty file was not expected");
+        fail("Empty file was not expected");
       }
       int i = 0;
       while (reader.hasNext()){
         record = reader.next();
         assertEquals(expectedResults[i++], record.toString());
       }
+      if (expectedResults != null && expectedResults.length > i) {
+        fail("More output data was expected");
+      }
     }
     catch (IOException ioe) {
+      LOG.error("Issue with verifying the output", ioe);
       throw new RuntimeException(ioe);
     }
   }

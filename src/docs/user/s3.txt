@@ -1,0 +1,242 @@
+
+////
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+////
+
+Sqoop-Amazon S3 Integration
+---------------------------
+
+Background
+~~~~~~~~~~
+
+Amazon Simple Storage Service, or Amazon S3, is a cloud computing web service offered by Amazon Web Services that
+facilitates highly-scalable, secured and low-latency data storage from the cloud.
+For learning more about S3 please see the official documentation at https://aws.amazon.com/documentation/s3/.
+
+Sqoop can be used to transfer data between a relational database management system (RDBMS)
+and Amazon S3 exploiting the capabilities of the Hadoop-Amazon Web Services integration.
+For learning more about the Hadoop-AWS module please see the Hadoop documentation at
+https://hadoop.apache.org/docs/stable/hadoop-aws/tools/hadoop-aws/index.html.
+
+Authentication
+~~~~~~~~~~~~~~
+
+Users authenticate to an S3 bucket using AWS credentials. The standard way to authenticate is with an access key
+and secret key using the properties in the configuration file. The AWS credentials can be passed to the sqoop job via
+setting the following properties: +fs.s3a.access.key+, +fs.s3a.secret.key+ and +fs.s3a.session.token+,
+the latter one only in case of temporary AWS credentials.
+
+For learning more about the S3 authentication methods please see the Hadoop documentation at
+https://hadoop.apache.org/docs/stable/hadoop-aws/tools/hadoop-aws/index.html#S3A_Authentication_methods.
+
+Import Into Amazon S3
+~~~~~~~~~~~~~~~~~~~~~
+
+Sqoop import is supported into the S3A (s3a://) filesystem only.
+
+To import data from RDBMS into an S3 bucket the +--target-dir+ option has to be set to the target location in
+the S3 bucket. Example usage:
+
+----
+$ sqoop import \
+  -Dfs.s3a.access.key=$AWS_ACCESS_KEY \
+  -Dfs.s3a.secret.key=$AWS_SECRET_KEY \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLENAME \
+  --target-dir s3a://example-bucket/target-directory
+----
+
+Data from RDBMS can be imported into S3 as Sequence, Avro and Parquet file formats too.
+
+Incremental Import
+^^^^^^^^^^^^^^^^^^
+
+To import data from RDBMS into an S3 bucket in incremental mode the +temporary-rootdir+ option always has to
+be set and has to point to a location in the S3 bucket.
+
+Incremental Append Mode
++++++++++++++++++++++++
+
+In case of +append+ mode the location of the temporary root directory has to be in the same bucket as the target directory,
+for example +s3a://example-bucket/temporary-rootdir+ or +s3a://example-bucket/target-directory/temporary-rootdir+.
+Example usage:
+
+----
+$ sqoop import \
+  -Dfs.s3a.access.key=$AWS_ACCESS_KEY \
+  -Dfs.s3a.secret.key=$AWS_SECRET_KEY \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLE_NAME \
+  --target-dir s3a://example-bucket/target-directory \
+  --incremental append \
+  --check-column $CHECK_COLUMN \
+  --last-value $LAST_VALUE \
+  --temporary-rootdir s3a://example-bucket/temporary-rootdir
+----
+
+Data from RDBMS can be imported into S3 in incremental +append+ mode as Sequence, Avro and Parquet file formats too.
+
+Incremental Lastmodified Mode
++++++++++++++++++++++++++++++
+
+In case of +lastmodified+ mode the location of the temporary root directory has to be in the same bucket and in the same
+directory as the target directory, for example +s3a://example-bucket/temporary-rootdir+ in case of
++s3a://example-bucket/target-directory+. Example usage:
+
+----
+$ sqoop import \
+  -Dfs.s3a.access.key=$AWS_ACCES_KEY \
+  -Dfs.s3a.secret.key=$AWS_SECRET_KEY \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLE_NAME \
+  --target-dir s3a://example-bucket/target-directory \
+  --incremental lastmodified \
+  --check-column $CHECK_COLUMN \
+  --merge-key $MERGE_KEY \
+  --last-value $LAST_VALUE \
+  --temporary-rootdir s3a://example-bucket/temporary-rootdir
+----
+
+Data from RDBMS can be imported into S3 in incremental +lastmodified+ mode as Parquet file format too.
+
+Import Into External Hive Table Backed By S3
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To import data from RDBMS into an external Hive table backed by S3 the AWS credentials have to be set in the Hive
+configuration file (+hive-site.xml+) too. For learning more about Hive on Amazon Web Services please see the Hive
+documentation at https://cwiki.apache.org/confluence/display/Hive/HiveAws.
+
+The current implementation of Sqoop requires that both +target-dir+ and +external-table-dir+ options are set
+where +external-table-dir+ has to point to the Hive table location in the S3 bucket.
+
+Import into an external Hive table backed by S3 for example:
+
+----
+$ sqoop import \
+  -Dfs.s3a.access.key=$AWS_ACCES_KEY \
+  -Dfs.s3a.secret.key=$AWS_SECRET_KEY \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLE_NAME \
+  --hive-import \
+  --target-dir s3a://example-bucket/target-directory \
+  --external-table-dir s3a://example-bucket/external-directory
+----
+
+Create an external Hive table backed by S3 for example:
+
+----
+$ sqoop import \
+  -Dfs.s3a.access.key=$AWS_ACCES_KEY \
+  -Dfs.s3a.secret.key=$AWS_SECRET_KEY \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLE_NAME \
+  --hive-import \
+  --create-hive-table \
+  --hive-table $HIVE_TABLE_NAME \
+  --target-dir s3a://example-bucket/target-directory \
+  --external-table-dir s3a://example-bucket/external-directory
+----
+
+Data from RDBMS can be imported into an external Hive table backed by S3 as Parquet file format too.
+
+Storing AWS credentials in Hadoop Credential Provider
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The recommended way to protect the AWS credentials from prying eyes is to use Hadoop Credential Provider to securely
+store and access them through configuration. For learning more about how to use the Credential Provider framework
+please see the corresponding chapter in the Hadoop AWS documentation at
+https://hadoop.apache.org/docs/current/hadoop-aws/tools/hadoop-aws/index.html#Protecting_the_AWS_Credentials.
+For a guide to the Hadoop Credential Provider API please see the Hadoop documentation at
+https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html.
+
+After creating a credential file with the credential entries the URL to the provider can be set via the
++hadoop.security.credential.provider.path+ property.
+
+Hadoop Credential Provider is often protected by password supporting three options:
+
+* Default password: hardcoded password is the default
+* Environment variable: +HADOOP_CREDSTORE_PASSWORD+ environment variable is set to a custom password
+* Password file: location of the password file storing a custom password is set via the
++hadoop.security.credstore.java-keystore-provider.password-file+ property
+
+Example usage in case of a default password or a custom password set in +HADOOP_CREDSTORE_PASSWORD+ environment variable:
+
+----
+$ sqoop import \
+  -Dhadoop.security.credential.provider.path=$CREDENTIAL_PROVIDER_URL \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLENAME \
+  --target-dir s3a://example-bucket/target-directory
+----
+
+Example usage in case of a custom password stored in a password file:
+
+----
+$ sqoop import \
+  -Dhadoop.security.credential.provider.path=$CREDENTIAL_PROVIDER_URL \
+  -Dhadoop.security.credstore.java-keystore-provider.password-file=$PASSWORD_FILE_LOCATION \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLENAME \
+  --target-dir s3a://example-bucket/target-directory
+----
+
+Regarding the exact mechanics of using the environment variable or a password file please see the Hadoop documentation at
+https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html#Mechanics.
+
+Hadoop S3Guard usage with Sqoop
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Amazon S3 offers eventual consistency for PUTS and DELETES in all regions which means the visibility of the files
+are not guaranteed in a specific time after creation. Due to this behavior it can happen that right after a
+sqoop import the data will not be visible immediately. For learning more about the core concepts of Amazon S3
+please see the official documentation at https://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#CoreConcepts.
+
+S3Guard is an experimental feature for the S3A client in Hadoop which can use a database as a store of metadata about
+objects in an S3 bucket. For learning more about S3Guard please see the Hadoop documentation at
+https://hadoop.apache.org/docs/r3.0.3/hadoop-aws/tools/hadoop-aws/s3guard.html.
+
+S3Guard can be enabled during sqoop imports via setting properties described in the linked documentation.
+
+Example usage with setting S3Guard:
+
+----
+$ sqoop import \
+  -Dfs.s3a.access.key=$AWS_ACCESS_KEY \
+  -Dfs.s3a.secret.key=$AWS_SECRET_KEY \
+  -Dfs.s3a.metadatastore.impl=org.apache.hadoop.fs.s3a.s3guard.DynamoDBMetadataStore \
+  -Dfs.s3a.s3guard.ddb.region=$BUCKET_REGION \
+  -Dfs.s3a.s3guard.ddb.table.create=true \
+  --connect $CONN \
+  --username $USER \
+  --password $PWD \
+  --table $TABLENAME \
+  --target-dir s3a://example-bucket/target-directory
+----

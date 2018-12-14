@@ -67,7 +67,7 @@ public class TestMainframeManager extends BaseSqoopTestCase {
     opts = getSqoopOptions(conf);
     opts.setConnectString("dummy.server");
     opts.setTableName("dummy.pds");
-    opts.setConnManagerClassName("org.apache.sqoop.manager.MainframeManager");
+    opts.setConnManagerClassName(MainframeManager.class.getName());
     context = new ImportJobContext(getTableName(), null, opts, null);
     ConnFactory f = new ConnFactory(conf);
     try {
@@ -119,6 +119,7 @@ public class TestMainframeManager extends BaseSqoopTestCase {
     } catch (IOException e) {
       fail("No IOException should be thrown!");
     } finally {
+      HBaseUtil.setAlwaysNoHBaseJarMode(false);
       opts.setHBaseTable(null);
     }
   }

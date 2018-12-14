@@ -43,9 +43,11 @@ import java.util.StringTokenizer;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
+import org.apache.avro.LogicalType;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.sqoop.manager.oracle.OracleUtils;
 import org.apache.sqoop.util.LoggingUtils;
 
@@ -469,7 +471,7 @@ public class OracleManager
       throws IOException, ExportException {
     context.setConnManager(this);
     JdbcExportJob exportJob = new JdbcExportJob(context,
-            null, null, ExportBatchOutputFormat.class);
+            null, null, ExportBatchOutputFormat.class, getParquetJobConfigurator().createParquetExportJobConfigurator());
     exportJob.runExport();
   }
 
@@ -481,7 +483,7 @@ public class OracleManager
       throws IOException, ExportException {
     context.setConnManager(this);
     JdbcUpsertExportJob exportJob =
-      new JdbcUpsertExportJob(context, OracleUpsertOutputFormat.class);
+      new JdbcUpsertExportJob(context, OracleUpsertOutputFormat.class, getParquetJobConfigurator().createParquetExportJobConfigurator());
     exportJob.runExport();
   }
 
@@ -1112,5 +1114,12 @@ public class OracleManager
       return "SELECT MIN(" + splitByCol + "), MAX(" + splitByCol + ") FROM ("
                    + sanitizedQuery + ") t1";
   }
+
+  @Override
+  public LogicalType toAvroLogicalType(int sqlType, Integer precision, Integer scale) {
+    Configuration conf = options.getConf();
+    return OracleUtils.toAvroLogicalType(sqlType, precision, scale, conf);
+  }
+
 }
 
