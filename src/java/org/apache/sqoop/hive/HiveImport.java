@@ -82,7 +82,7 @@ public class HiveImport {
     // Fall back to just plain 'hive' and hope it's in the path.
 
     String hiveHome = options.getHiveHome();
-    String hiveCommand = Shell.WINDOWS ? "hive.cmd" : "hive";
+    String hiveCommand = Shell.WINDOWS ? "hive.cmd" : "beeline";
     if (null == hiveHome) {
       return hiveCommand;
     }
@@ -291,7 +291,13 @@ public class HiveImport {
     // run Hive on the script and note the return code.
     String hiveExec = getHiveBinPath();
 
-    String[] argv = new String[]{hiveExec, "-f", filename};
+    String[] argv;
+    if (System.getenv("HADOOP_TOKEN_FILE_LOCATION") != null) {
+      env.add("HADOOP_TOKEN_FILE_LOCATION=" + System.getenv("HADOOP_TOKEN_FILE_LOCATION"));
+      argv = new String[]{hiveExec, "-a", "delegationToken", "-f", filename};
+    } else {
+      argv = new String[]{hiveExec, "-f", filename};
+    }
 
     LoggingAsyncSink logSink = new LoggingAsyncSink(LOG);
     int ret = Executor.exec(argv, env.toArray(new String[0]), logSink, logSink);
