@@ -28,6 +28,7 @@ under the License.
     </description>
   </info>
   <configurations defaultconfmapping="default">
+
     <!--these match the Maven configurations-->
     <conf name="default" extends="master,runtime"/>
     <conf name="master" description="contains the artifact but no dependencies"/>
@@ -195,6 +196,9 @@ under the License.
       conf="avro->default;redist->default">
       <exclude org="com.twitter" module="parquet-hive-bundle"/>
     </dependency>
+    <dependency org="com.fasterxml.jackson.core" name="jackson-databind" rev="${jackson-databind.version}"
+      conf="avro->default;redist->default"
+    />
 
     <!-- dependencies for static analysis -->
     <dependency org="checkstyle" name="checkstyle" rev="${checkstyle.version}"
