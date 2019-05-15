@@ -128,6 +128,7 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
   public static final String CREATE_HIVE_TABLE_ARG =
       "create-hive-table";
   public static final String HCATALOG_TABLE_ARG = "hcatalog-table";
+  public static final String HCATALOG_EXTERNAL_TABLE_ARG = "hcatalog-external-table";
   public static final String HCATALOG_DATABASE_ARG = "hcatalog-database";
   public static final String CREATE_HCATALOG_TABLE_ARG =
     "create-hcatalog-table";
@@ -644,6 +645,10 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
       .withDescription("HCatalog table name")
       .withLongOpt(HCATALOG_TABLE_ARG)
       .create());
+    hCatOptions.addOption(OptionBuilder
+            .withDescription("Signing that HCatalog table shall be created as external")
+            .withLongOpt(HCATALOG_EXTERNAL_TABLE_ARG)
+            .create());
     hCatOptions.addOption(OptionBuilder
       .hasArg()
       .withDescription("HCatalog database name")
@@ -1283,6 +1288,10 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
       out.setHCatTableName(in.getOptionValue(HCATALOG_TABLE_ARG));
     }
 
+    if (in.hasOption(HCATALOG_EXTERNAL_TABLE_ARG)) {
+      out.setExternalHCatTable(true);
+    }
+
     if (in.hasOption(HCATALOG_DATABASE_ARG)) {
       out.setHCatDatabaseName(in.getOptionValue(HCATALOG_DATABASE_ARG));
     }
@@ -1567,6 +1576,13 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
       throw new InvalidOptionsException("The " + HCATALOG_TABLE_ARG
         + " option conflicts with the " + HIVE_IMPORT_ARG
         + " option." + HELP_STR);
+    }
+
+    if(options.isHCatTableExternal() &&
+            !(options.doCreateHCatalogTable() || options.doDropAndCreateHCatalogTable())) {
+      throw new InvalidOptionsException(String.format(
+              "Using --%s only takes effect when --%s or --%s is present",
+              HCATALOG_EXTERNAL_TABLE_ARG, CREATE_HCATALOG_TABLE_ARG, DROP_AND_CREATE_HCATALOG_TABLE));
     }
 
     if (options.doHiveImport()
