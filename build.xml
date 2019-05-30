@@ -31,6 +31,11 @@
     </classpath>
   </taskdef>
 
+  <taskdef
+          classpath="lib/ant-shade-task.jar"
+          resource="org/apache/tools/ant/taskdefs/shade.properties"
+  />
+
   <!-- Load system-wide and project-wide default properties set by
        the user, to avoid needing to override with -D. -->
   <property file="${user.home}/build.properties" />
@@ -169,9 +174,9 @@
   <property name="ivysettings.xml" location="${ivy.dir}/ivysettings.xml"/>
   <property name="ivy.jar" location="${lib.dir}/ivy-${ivy.version}.jar"/>
   <property name="ivy_repo_url"
-  value="http://repo2.maven.org/maven2/org/apache/ivy/ivy/${ivy.version}/ivy-${ivy.version}.jar" />
+  value="https://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.version}/ivy-${ivy.version}.jar" />
   <property name="mvn_repo_url"
-  value="http://repo2.maven.org/maven2/org/apache/maven/maven-ant-tasks/${mvn.version}/maven-ant-tasks-${mvn.version}.jar"/>
+  value="https://repo1.maven.org/maven2/org/apache/maven/maven-ant-tasks/${mvn.version}/maven-ant-tasks-${mvn.version}.jar"/>
   <property name="mvn.jar"
       location="${build.dir}/maven-ant-tasks-${mvn.version}.jar" />
   <property name="build.ivy.dir" location="${build.dir}/ivy" />
@@ -313,6 +318,7 @@
     <path id="lib.path">
       <fileset dir="${lib.dir}">
         <include name="*.jar" />
+        <exclude name="ant-shade-task.jar" />
       </fileset>
     </path>
 
@@ -489,6 +495,59 @@
 
     <mkdir dir="${dist.dir}"/>
 
+    <shade jar="${build.dir}/${dest.jar}" uberJar="${build.dir}/${dest.jar}-shaded.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+
+    <shade jar="build/ivy/lib/sqoop/redist/avro-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-avro-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-avro-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-avro-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/avro-mapred-1.8.1-hadoop2.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-avro-mapred-1.8.1-hadoop2.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-hadoop-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-hadoop-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-common-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-common-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-column-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-column-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-format-2.3.0-incubating.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-format-2.3.0-incubating.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-encoding-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-encoding-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-jackson-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-jackson-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+
+
+
+    <move file="${build.dir}/${dest.jar}-shaded.jar" tofile="${build.dir}/${dest.jar}"/>
+    <delete file="build/ivy/lib/sqoop/redist/avro-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-avro-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/avro-mapred-1.8.1-hadoop2.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-hadoop-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-common-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-column-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-format-2.3.0-incubating.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-encoding-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-jackson-1.8.1.jar"/>
+
     <!-- copy in the build artifact -->
     <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
       <fileset dir="${build.dir}">
@@ -583,6 +642,7 @@
         <exclude name="${bin.artifact.name}/bin/*" />
         <exclude name="${bin.artifact.name}/testdata/hive/bin/*" />
         <exclude name="${bin.artifact.name}/**/*.sh" />
+        <exclude name="${bin.artifact.name}/lib/ant-shade-task.jar" />
         <include name="${bin.artifact.name}/**" />
       </tarfileset>
       <tarfileset dir="${build.dir}" mode="755">
