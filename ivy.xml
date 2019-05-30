@@ -271,7 +271,7 @@ under the License.
     </dependency>
 
     <dependency org="org.apache.avro" name="avro" rev="${avro.version}"
-      conf="runtime->default;redist->default">
+      conf="redist->default">
       <exclude org="org.slf4j" module="slf4j-api"/>
       <exclude org="org.mortbay.jetty" module="jetty"/>
       <exclude org="org.jboss.netty" module="netty"/>

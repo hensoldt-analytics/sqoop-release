@@ -31,6 +31,11 @@
     </classpath>
   </taskdef>
 
+  <taskdef
+          classpath="lib/ant-shade-task.jar"
+          resource="org/apache/tools/ant/taskdefs/shade.properties"
+  />
+
   <!-- Load system-wide and project-wide default properties set by
        the user, to avoid needing to override with -D. -->
   <property file="${user.home}/build.properties" />
@@ -509,6 +514,21 @@
       description="Create a redistributable package">
 
     <mkdir dir="${dist.dir}"/>
+
+    <shade jar="${build.dir}/${dest.jar}" uberJar="${build.dir}/${dest.jar}-shaded.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+    </shade>
+
+    <shade jar="build/ivy/lib/sqoop/redist/avro-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-avro-1.8.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-avro-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-avro-1.9.0.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+    </shade>
+
+    <move file="${build.dir}/${dest.jar}-shaded.jar" tofile="${build.dir}/${dest.jar}"/>
+    <delete file="build/ivy/lib/sqoop/redist/avro-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-avro-1.9.0.jar"/>
 
     <!-- copy in the build artifact -->
     <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
