@@ -36,6 +36,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.sqoop.accumulo.AccumuloConstants;
 import org.apache.sqoop.mapreduce.mainframe.MainframeConfiguration;
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation;
 import org.apache.sqoop.tool.BaseSqoopTool;
 import org.apache.sqoop.util.CredentialsUtil;
 import org.apache.sqoop.util.LoggingUtils;
@@ -52,6 +53,7 @@ import org.apache.sqoop.util.RandomHash;
 import org.apache.sqoop.util.StoredAsProperty;
 
 import static org.apache.sqoop.Sqoop.SQOOP_RETHROW_PROPERTY;
+import static org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation.HADOOP;
 import static org.apache.sqoop.orm.ClassWriter.toJavaIdentifier;
 
 /**
@@ -86,6 +88,7 @@ public class SqoopOptions implements Cloneable {
     SequenceFile,
     AvroDataFile,
     ParquetFile,
+    BinaryFile,
     OrcFile
   }
 
@@ -366,7 +369,12 @@ public class SqoopOptions implements Cloneable {
   // Indicates if the data set is on tape to use different FTP parser
   @StoredAsProperty("mainframe.input.dataset.tape")
   private String mainframeInputDatasetTape;
-
+  // Indicates if binary or ascii FTP transfer mode should be used
+  @StoredAsProperty("mainframe.ftp.transfermode")
+  private String mainframeFtpTransferMode;
+  // Buffer size to use when using binary FTP transfer mode
+  @StoredAsProperty("mainframe.ftp.buffersize")
+  private Integer bufferSize;
   // Accumulo home directory
   private String accumuloHome; // not serialized to metastore.
   // Zookeeper home directory
@@ -455,6 +463,18 @@ public class SqoopOptions implements Cloneable {
   private String metaConnectStr;
   private String metaUsername;
   private String metaPassword;
+
+  @StoredAsProperty("hs2.url")
+  private String hs2Url;
+
+  @StoredAsProperty("hs2.user")
+  private String hs2User;
+
+  @StoredAsProperty("hs2.keytab")
+  private String hs2Keytab;
+
+  @StoredAsProperty("parquet.configurator.implementation")
+  private ParquetJobConfiguratorImplementation parquetConfiguratorImplementation;
 
   public SqoopOptions() {
     initDefaults(null);
@@ -1152,6 +1172,13 @@ public class SqoopOptions implements Cloneable {
 
     // set escape column mapping to true
     this.escapeColumnMappingEnabled = true;
+
+    this.parquetConfiguratorImplementation = HADOOP;
+
+    // set default transfer mode to ascii
+    this.mainframeFtpTransferMode = MainframeConfiguration.MAINFRAME_FTP_TRANSFER_MODE_ASCII;
+    // set default buffer size for mainframe binary transfers
+    this.bufferSize = MainframeConfiguration.MAINFRAME_FTP_TRANSFER_BINARY_DEFAULT_BUFFER_SIZE;
   }
 
   /**
@@ -2524,6 +2551,23 @@ public class SqoopOptions implements Cloneable {
   public void setMainframeInputDatasetTape(String txtIsFromTape) {
 	  mainframeInputDatasetTape = Boolean.valueOf(Boolean.parseBoolean(txtIsFromTape)).toString();
   }
+  // returns the buffer size set.
+  public Integer getBufferSize() {
+    return bufferSize;
+  }
+
+  public void setMainframeFtpTransferMode(String transferMode) {
+    mainframeFtpTransferMode = transferMode;
+  }
+
+  public String getMainframeFtpTransferMode() {
+    return mainframeFtpTransferMode;
+  }
+
+  // sets the binary transfer buffer size, defaults to MainframeConfiguration.MAINFRAME_FTP_TRANSFER_BINARY_DEFAULT_BUFFER_SIZE
+  public void setBufferSize(int buf) {
+    bufferSize = buf;
+  }
 
   public static String getAccumuloHomeDefault() {
     // Set this with $ACCUMULO_HOME, but -Daccumulo.home can override.
@@ -2947,5 +2991,36 @@ public class SqoopOptions implements Cloneable {
     this.metaPassword = metaPassword;
   }
 
+  public String getHs2Url() {
+    return hs2Url;
+  }
+
+  public void setHs2Url(String hs2Url) {
+    this.hs2Url = hs2Url;
+  }
+
+  public String getHs2User() {
+    return hs2User;
+  }
+
+  public void setHs2User(String hs2User) {
+    this.hs2User = hs2User;
+  }
+
+  public String getHs2Keytab() {
+    return hs2Keytab;
+  }
+
+  public void setHs2Keytab(String hs2Keytab) {
+    this.hs2Keytab = hs2Keytab;
+  }
+
+  public ParquetJobConfiguratorImplementation getParquetConfiguratorImplementation() {
+    return parquetConfiguratorImplementation;
+  }
+
+  public void setParquetConfiguratorImplementation(ParquetJobConfiguratorImplementation parquetConfiguratorImplementation) {
+    this.parquetConfiguratorImplementation = parquetConfiguratorImplementation;
+  }
 }
 

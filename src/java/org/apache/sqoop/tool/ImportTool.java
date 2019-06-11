@@ -43,12 +43,17 @@ import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.SqoopOptions.InvalidOptionsException;
 import org.apache.sqoop.cli.RelatedOptions;
 import org.apache.sqoop.cli.ToolOptions;
+import org.apache.sqoop.config.ConfigurationHelper;
+import org.apache.sqoop.hive.HiveClient;
+import org.apache.sqoop.hive.HiveClientFactory;
 import org.apache.sqoop.config.ConfigurationConstants;
 import org.apache.sqoop.hive.HiveImport;
 import org.apache.sqoop.manager.ConnManager;
 import org.apache.sqoop.manager.ImportJobContext;
 import org.apache.sqoop.mapreduce.ImportJobBase;
 import org.apache.sqoop.mapreduce.MergeJob;
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorFactory;
+import org.apache.sqoop.mapreduce.parquet.ParquetMergeJobConfigurator;
 import org.apache.sqoop.mapreduce.PublishJobData;
 import org.apache.sqoop.metastore.JobData;
 import org.apache.sqoop.metastore.JobStorage;
@@ -61,6 +66,7 @@ import org.apache.sqoop.util.ImportException;
 import org.apache.sqoop.util.OrcUtil;
 
 import static org.apache.sqoop.manager.SupportedManagers.MYSQL;
+import static org.apache.commons.lang3.StringUtils.startsWith;
 
 /**
  * Tool that performs database imports to HDFS.
@@ -84,6 +90,10 @@ public class ImportTool extends BaseSqoopTool {
   // Set classloader for local job runner
   private ClassLoader prevClassLoader = null;
 
+  private final HiveClientFactory hiveClientFactory;
+
+  private final String S3_URI_SCHEME = "s3a://";
+
   OrcUtil orcUtil = OrcUtil.getInstance();
 
   public ImportTool() {
@@ -91,13 +101,14 @@ public class ImportTool extends BaseSqoopTool {
   }
 
   public ImportTool(String toolName, boolean allTables) {
-    this(toolName, new CodeGenTool(), allTables);
+    this(toolName, new CodeGenTool(), allTables, new HiveClientFactory());
   }
 
-  public ImportTool(String toolName, CodeGenTool codeGenerator, boolean allTables) {
+  public ImportTool(String toolName, CodeGenTool codeGenerator, boolean allTables, HiveClientFactory hiveClientFactory) {
     super(toolName);
     this.codeGenerator = codeGenerator;
     this.allTables = allTables;
+    this.hiveClientFactory = hiveClientFactory;
   }
 
   @Override
@@ -120,9 +131,7 @@ public class ImportTool extends BaseSqoopTool {
   private void loadJars(Configuration conf, String ormJarFile,
                         String tableClassName) throws IOException {
 
-    boolean isLocal = "local".equals(conf.get("mapreduce.jobtracker.address"))
-        || "local".equals(conf.get("mapred.job.tracker"));
-    if (isLocal) {
+    if (ConfigurationHelper.isLocalJobTracker(conf)) {
       // If we're using the LocalJobRunner, then instead of using the compiled
       // jar file as the job source, we're running in the current thread. Push
       // on another classloader that loads from that jar in addition to
@@ -332,7 +341,7 @@ public class ImportTool extends BaseSqoopTool {
       }
       break;
     case DateLastModified:
-      if (options.getMergeKeyCol() == null && !options.isAppendMode()) {
+      if (shouldCheckExistingOutputDirectory(options)) {
         Path outputPath = getOutputPath(options, context.getTableName(), false);
         FileSystem fs = outputPath.getFileSystem(options.getConf());
         if (fs.exists(outputPath)) {
@@ -476,7 +485,8 @@ public class ImportTool extends BaseSqoopTool {
           loadJars(options.getConf(), context.getJarFile(), context.getTableName());
         }
 
-        MergeJob mergeJob = new MergeJob(options);
+        ParquetMergeJobConfigurator parquetMergeJobConfigurator = getParquetJobConfigurator(options).createParquetMergeJobConfigurator();
+        MergeJob mergeJob = new MergeJob(options, parquetMergeJobConfigurator);
         if (mergeJob.runMergeJob()) {
           // Rename destination directory to proper location.
           Path tmpDir = getOutputPath(options, context.getTableName());
@@ -507,18 +517,16 @@ public class ImportTool extends BaseSqoopTool {
    * Import a table or query.
    * @return true if an import was performed, false otherwise.
    */
-  protected boolean importTable(SqoopOptions options,
-      HiveImport hiveImport) throws IOException, ImportException {
-    String tableName = options.getTableName();
+  protected boolean importTable(SqoopOptions options) throws IOException, ImportException {
     String jarFile = null;
 
     // Generate the ORM code for the tables.
-    jarFile = codeGenerator.generateORM(options, tableName);
+    jarFile = codeGenerator.generateORM(options, options.getTableName());
 
-    Path outputPath = getOutputPath(options, tableName);
+    Path outputPath = getOutputPath(options, options.getTableName());
 
     // Do the actual import.
-    ImportJobContext context = new ImportJobContext(tableName, jarFile,
+    ImportJobContext context = new ImportJobContext(options.getTableName(), jarFile,
         options, outputPath);
 
     // If we're doing an incremental import, set up the
@@ -537,7 +545,7 @@ public class ImportTool extends BaseSqoopTool {
 
     long startTime = new Date().getTime();
 
-    if (null != tableName) {
+    if (null != options.getTableName()) {
       manager.importTable(context);
     } else {
       manager.importQuery(context);
@@ -551,19 +559,16 @@ public class ImportTool extends BaseSqoopTool {
     }
 
     // If the user wants this table to be in Hive, perform that post-load.
-    if (options.doHiveImport()) {
-      // For Parquet file, the import action will create hive table directly via
-      // kite. So there is no need to do hive import as a post step again.
-      if (options.getFileLayout() != SqoopOptions.FileLayout.ParquetFile) {
-        hiveImport.importTable(tableName, options.getHiveTableName(), false);
-      }
+    if (isHiveImportNeeded(options)) {
+      HiveClient hiveClient = hiveClientFactory.createHiveClient(options, manager);
+      hiveClient.importTable();
     }
 
-    if (options.doHiveImport() || options.getHCatTableName() != null) {
+    if (isHiveImportNeeded(options) || options.getHCatTableName() != null) {
       // Publish data for import job, only hive/hcat import jobs are supported now.
-      LOG.info("Publishing Hive/Hcat import job data to Listeners for table " + tableName);
+      LOG.info("Publishing Hive/Hcat import job data to Listeners for table " + options.getTableName());
       String publishClass = options.getConf().get(ConfigurationConstants.DATA_PUBLISH_CLASS);
-      PublishJobData.publishJobData(publishClass, options, ImportJobBase.OPERATION, tableName, startTime);
+      PublishJobData.publishJobData(publishClass, options, ImportJobBase.OPERATION, options.getTableName(), startTime);
     }
 
     saveIncrementalState(options);
@@ -631,8 +636,6 @@ public class ImportTool extends BaseSqoopTool {
   @Override
   /** {@inheritDoc} */
   public int run(SqoopOptions options) {
-    HiveImport hiveImport = null;
-
     if (allTables) {
       // We got into this method, but we should be in a subclass.
       // (This method only handles a single table)
@@ -648,12 +651,8 @@ public class ImportTool extends BaseSqoopTool {
     codeGenerator.setManager(manager);
 
     try {
-      if (options.doHiveImport()) {
-        hiveImport = new HiveImport(options, manager, options.getConf(), false);
-      }
-
       // Import a single table (or query) the user specified.
-      importTable(options, hiveImport);
+      importTable(options);
     } catch (IllegalArgumentException iea) {
         LOG.error(IMPORT_FAILED_ERROR_MSG + iea.getMessage());
       rethrowIfRequired(options, iea);
@@ -774,6 +773,10 @@ public class ImportTool extends BaseSqoopTool {
         .withDescription("Imports data to ORC files")
         .withLongOpt(BaseSqoopTool.FMT_ORCFILE_ARG)
         .create());
+    importOpts.addOption(OptionBuilder
+      .withDescription("Imports data to Binary files")
+      .withLongOpt(BaseSqoopTool.FMT_BINARYFILE_ARG)
+      .create());
     importOpts.addOption(OptionBuilder.withArgName("n")
         .hasArg().withDescription("Use 'n' map tasks to import in parallel")
         .withLongOpt(NUM_MAPPERS_ARG)
@@ -1196,6 +1199,18 @@ public class ImportTool extends BaseSqoopTool {
           + INCREMENT_TYPE_ARG + " lastmodified cannot be used in conjunction with --"
           + FMT_AVRODATAFILE_ARG + "." + HELP_STR);
     }
+
+    if (isIncrementalModeAppendOrLastmodified(options)
+            && startsWith(options.getTargetDir(), S3_URI_SCHEME)
+            && !startsWith(options.getTempRootDir(), S3_URI_SCHEME)) {
+      throw new InvalidOptionsException("For an " + INCREMENT_TYPE_ARG + " import into an S3 bucket --"
+              + TEMP_ROOTDIR_ARG  + " option must be always set to a location in S3.");
+    }
+  }
+
+  private boolean isIncrementalModeAppendOrLastmodified(SqoopOptions options) {
+    return options.getIncrementalMode() == SqoopOptions.IncrementalMode.AppendRows
+            || options.getIncrementalMode() == SqoopOptions.IncrementalMode.DateLastModified;
   }
 
   @Override
@@ -1221,6 +1236,27 @@ public class ImportTool extends BaseSqoopTool {
     validateHiveOptions(options);
     validateHCatalogOptions(options);
     validateAccumuloOptions(options);
+  }
+
+  boolean shouldCheckExistingOutputDirectory(SqoopOptions options) {
+    return options.getMergeKeyCol() == null && !options.isAppendMode() && !isHBaseImport(options);
+  }
+
+  private boolean isHBaseImport(SqoopOptions options) {
+    return options.getHBaseTable() != null;
+  }
+
+  private boolean isHiveImportNeeded(SqoopOptions options) {
+    if (!options.doHiveImport()) {
+      return false;
+    }
+
+    if (options.getFileLayout() != SqoopOptions.FileLayout.ParquetFile) {
+      return true;
+    }
+
+    ParquetJobConfiguratorFactory parquetJobConfigurator = getParquetJobConfigurator(options);
+    return parquetJobConfigurator.createParquetImportJobConfigurator().isHiveImportNeeded();
   }
 }
 

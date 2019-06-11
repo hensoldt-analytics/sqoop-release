@@ -15,29 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.apache.sqoop.mapreduce;
-
-import org.apache.avro.generic.GenericRecord;
-import org.apache.hadoop.io.NullWritable;
-
-import java.io.IOException;
+package org.apache.sqoop.testcategories.thirdpartytest;
 
 /**
- * Exports Parquet records from a data source.
+ * An Oracle test shall test scenarios where a Oracle driver and/or external instance is required.
  */
-public class ParquetExportMapper
-    extends GenericRecordExportMapper<GenericRecord, NullWritable> {
-
-  @Override
-  protected void setup(Context context) throws IOException, InterruptedException {
-    super.setup(context);
-  }
-
-  @Override
-  protected void map(GenericRecord key, NullWritable val,
-      Context context) throws IOException, InterruptedException {
-    context.write(toSqoopRecord(key), NullWritable.get());
-  }
-
+public interface OracleTest extends ThirdPartyTest {
 }

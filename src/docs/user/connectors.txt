@@ -20,6 +20,27 @@
 Notes for specific connectors
 -----------------------------
 
+DB2 JDBC Connector
+~~~~~~~~~~~~~~~~~~
+
+This section contains information specific to DB2 JDBC Connector.
+
+Schema support
+^^^^^^^^^^^^^^
+
+When connecting to DB2 and using the import-all-tables or the list-tables tools,
+one can use the +\--schema+ tool option to specify the schema to use.  If the option
+is not present, then the schema of the current user (specified with the +\--username+ option) will be used as a default.
+Please note that this option doesn't work for any other tools at the moment,
+(such as the import tool or the export tool).
+
+Examples:
+
+----
+$ sqoop list-tables --connect $CONN  --username $USER --password $PASS -- --schema DB2INST2
+$ sqoop import-all-tables --connect $CONN  --username $USER --password $PASS -- --schema DB2INST2
+----
+
 MySQL JDBC Connector
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -127,7 +148,7 @@ Argument                                 Description
 ---------------------------------------------------------------------------------
 +\--identity-insert                      Set IDENTITY_INSERT to ON before \
                                          export insert.
-+\--non-resilient+                       Don't attempt to recover failed \
++\--resilient+                           Attempt to recover failed \
                                          export operations.
 +\--schema <name>+                       Scheme name that sqoop should use. \
                                          Default is "dbo".
@@ -144,15 +165,34 @@ You can allow inserts on columns that have identity. For example:
 $ sqoop export ... --export-dir custom_dir --table custom_table -- --identity-insert
 ----
 
-Non-resilient operations
-^^^^^^^^^^^^^^^^^^^^^^^^
+Resilient operations
+^^^^^^^^^^^^^^^^^^^^
 
-You can override the default and not use resilient operations during export.
-This will avoid retrying failed operations. For example:
+You can override the default and use resilient operations during export or import.
+This will retry failed operations, i.e. if the connection gets dropped by
+SQL Server, the mapper will try to reconnect and continue from where it was before.
 
+In case of export, the +\--resilient+ option will ensure that Sqoop will try to recover
+from connection resets.
+
+In case of import, however, one has to use both the +\--resilient+ option and specify
+the +\--split-by+ column to trigger the retry mechanism. An important requirement is
+that the data must be unique and ordered ascending by the split-by column, otherwise
+records could be either lost or duplicated.
+
+Example commands using resilient operations:
 ----
-$ sqoop export ... --export-dir custom_dir --table custom_table -- --non-resilient
+$ sqoop export ... --export-dir custom_dir --table custom_table -- --resilient
 ----
+
+Importing from a table:
+----
+$ sqoop import ... --table custom_table --split-by id -- --resilient
+----
+
+Importing via a query:
+----
+$ sqoop import ... --query "SELECT ... WHERE $CONDITIONS" --split-by ordered_column -- --resilient
 
 Schema support
 ^^^^^^^^^^^^^^

@@ -115,8 +115,8 @@
   <property name="src.tar.file" location="${build.dir}/${src.artifact.name}.tar.gz" />
 
   <!-- compilation -->
-  <property name="targetJavaVersion" value="1.7" />
-  <property name="sourceJavaVersion" value="1.7" />
+  <property name="targetJavaVersion" value="1.8" />
+  <property name="sourceJavaVersion" value="1.8" />
   <property name="javac.deprecation" value="off"/>
   <property name="javac.debug" value="on"/>
   <property name="build.encoding" value="ISO-8859-1"/>
@@ -246,6 +246,27 @@
   <property name="sqoop.test.netezza.db.name" value="SQOOP" />
   <property name="sqoop.test.netezza.table.name" value="EMPNZ" />
 
+  <property name="sqoop.test.mainframe.ftp.host" value="localhost" />
+  <property name="sqoop.test.mainframe.ftp.port" value="2121" />
+  <property name="sqoop.test.mainframe.ftp.username" value="test" />
+  <property name="sqoop.test.mainframe.ftp.password" value="test" />
+  <property name="sqoop.test.mainframe.ftp.dataset.gdg" value="TSODIQ1.GDGTEXT" />
+  <property name="sqoop.test.mainframe.ftp.dataset.gdg.filename" value="G0001V43" />
+  <property name="sqoop.test.mainframe.ftp.dataset.gdg.md5" value="f0d0d171fdb8a03dbc1266ed179d7093" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.gdg" value="TSODIQ1.FOLDER" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.gdg.filename" value="G0002V45" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.gdg.md5" value="43eefbe34e466dd3f65a3e867a60809a" />
+  <property name="sqoop.test.mainframe.ftp.dataset.seq" value="TSODIQ1.GDGTEXT.G0001V43" />
+  <property name="sqoop.test.mainframe.ftp.dataset.seq.filename" value="G0001V43" />
+  <property name="sqoop.test.mainframe.ftp.dataset.seq.md5" value="f0d0d171fdb8a03dbc1266ed179d7093" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.seq" value="TSODIQ1.FOLDER.FOLDERTXT" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.seq.filename" value="FOLDERTXT" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.seq.md5" value="1591c0fcc718fda7e9c1f3561d232b2b" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.mixed" value="TSODIQ1.MIXED" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.mixed.filename" value="G0039V00" />
+  <property name="sqoop.test.mainframe.ftp.binary.dataset.mixed.md5" value="5e7f4ec7cbeae8e0e0b4d88346eb9349" />
+  <property name="s3.bucket.url" value="" />
+  <property name="s3.generator.command" value="" />
 
   <condition property="windows">
     <os family="windows" />
@@ -724,15 +745,22 @@
     <copy todir="${test.build.extraconf}/oraoop">
       <fileset dir="${test.dir}/oraoop"/>
     </copy>
+    <copy file="${basedir}/conf/password-file.txt"
+          todir="${test.build.extraconf}" />
+    <copy file="${basedir}/conf/wrong-password-file.txt"
+          todir="${test.build.extraconf}" />
     <junit
       printsummary="yes" showoutput="${test.output}"
-      haltonfailure="no" fork="yes" maxmemory="1024m"
+      haltonfailure="no" fork="yes" maxmemory="5120m"
       errorProperty="tests.failed" failureProperty="tests.failed"
       timeout="${test.timeout}"
       dir="${build.test}/data">
 
       <!-- enable asserts in tests -->
       <jvmarg value="-ea" />
+
+      <!-- We need to disable asserts in HadoopThriftAuthBridge to be able to run HiveMiniCluster tests. -->
+      <jvmarg value="-da:org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge" />
 
       <jvmarg value="${remoteDebugJvmArgs}"/>
 
@@ -870,6 +898,29 @@
       <sysproperty key="sqoop.test.netezza.db.name" value="${sqoop.test.netezza.db.name}" />
       <sysproperty key="sqoop.test.netezza.table.name" value="${sqoop.test.netezza.table.name}" />
 
+      <sysproperty key="sqoop.test.mainframe.ftp.host" value="${sqoop.test.mainframe.ftp.host}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.port" value="${sqoop.test.mainframe.ftp.port}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.username" value="${sqoop.test.mainframe.ftp.username}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.password" value="${sqoop.test.mainframe.ftp.password}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.dataset.gdg" value="${sqoop.test.mainframe.ftp.dataset.gdg}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.dataset.gdg.filename" value="${sqoop.test.mainframe.ftp.dataset.gdg.filename}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.dataset.gdg.md5" value="${sqoop.test.mainframe.ftp.dataset.gdg.md5}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.gdg" value="${sqoop.test.mainframe.ftp.binary.dataset.gdg}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.gdg.filename" value="${sqoop.test.mainframe.ftp.binary.dataset.gdg.filename}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.gdg.md5" value="${sqoop.test.mainframe.ftp.binary.dataset.gdg.md5}" />
+
+      <sysproperty key="s3.bucket.url" value="${s3.bucket.url}" />
+      <sysproperty key="s3.generator.command" value="${s3.generator.command}" />
+
+      <sysproperty key="sqoop.test.mainframe.ftp.dataset.seq" value="${sqoop.test.mainframe.ftp.dataset.seq}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.dataset.seq.filename" value="${sqoop.test.mainframe.ftp.dataset.seq.filename}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.dataset.seq.md5" value="${sqoop.test.mainframe.ftp.dataset.seq.md5}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.seq" value="${sqoop.test.mainframe.ftp.binary.dataset.seq}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.seq.filename" value="${sqoop.test.mainframe.ftp.binary.dataset.seq.filename}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.seq.md5" value="${sqoop.test.mainframe.ftp.binary.dataset.seq.md5}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.mixed" value="${sqoop.test.mainframe.ftp.binary.dataset.mixed}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.mixed.filename" value="${sqoop.test.mainframe.ftp.binary.dataset.mixed.filename}" />
+      <sysproperty key="sqoop.test.mainframe.ftp.binary.dataset.mixed.md5" value="${sqoop.test.mainframe.ftp.binary.dataset.mixed.md5}" />
       <!-- Location of Hive logs -->
       <!--<sysproperty key="hive.log.dir"
                    value="${test.build.data}/sqoop/logs"/> -->
@@ -895,7 +946,10 @@
       <batchtest todir="${build.test}" unless="testcase">
         <fileset dir="${test.dir}"
                  includes="**/${test.pattern}.java"
-                 excludes="**/${test.exclude}.java" />
+                 excludes="**/${test.exclude}.java,**/KerberizedTest.java,**/IntegrationTest.java,**/SqoopTest.java,
+                 **/UnitTest.java,**/CubridTest.java,**/Db2Test.java,**/MainFrameTest.java,**/MysqlTest.java,
+                 **/NetezzaTest.java,**/OracleTest.java,**/PostgresqlTest.java,**/S3Test.java,**/SqlServerTest.java,
+                 **/ThirdPartyTest.java"/>
       </batchtest>
       <batchtest todir="${build.test}" if="testcase">
         <fileset dir="${test.dir}" includes="**/${testcase}.java"/>
@@ -1391,7 +1445,7 @@
 
   <target name="report" depends="ivy-resolve-hadoop">
     <mkdir dir="build/report"/>
-    <ivy:report todir="build/report"/>
+    <ivy:report todir="build/report" xsl="false" />
   </target>
 
 </project>

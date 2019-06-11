@@ -18,9 +18,6 @@
 
 package org.apache.sqoop.manager.mysql;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.apache.commons.logging.Log;
@@ -28,15 +25,19 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.sqoop.SqoopOptions;
+import org.apache.sqoop.testcategories.thirdpartytest.MysqlTest;
 import org.apache.sqoop.testutil.LobAvroImportTestCase;
+import org.junit.experimental.categories.Category;
 
 /**
  * Tests BLOB/CLOB import for Avro with MySQL Db.
  */
+@Category(MysqlTest.class)
 public class MySQLLobAvroImportTest extends LobAvroImportTestCase {
 
   public static final Log LOG = LogFactory.getLog(
       MySQLLobAvroImportTest.class.getName());
+
   private MySQLTestUtils mySQLTestUtils = new MySQLTestUtils();
 
   @Override
@@ -64,16 +65,7 @@ public class MySQLLobAvroImportTest extends LobAvroImportTestCase {
 
   @Override
   protected void dropTableIfExists(String table) throws SQLException {
-    Connection conn = getManager().getConnection();
-    PreparedStatement statement = conn.prepareStatement(
-        "DROP TABLE IF EXISTS " + table,
-        ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    try {
-      statement.executeUpdate();
-      conn.commit();
-    } finally {
-      statement.close();
-    }
+    mySQLTestUtils.dropTableIfExists(table, getManager());
   }
 
   @Override

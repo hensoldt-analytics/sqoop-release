@@ -34,11 +34,14 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.sqoop.mapreduce.JobBase;
 import org.apache.sqoop.mapreduce.db.DBConfiguration;
 import org.apache.sqoop.mapreduce.mainframe.MainframeConfiguration;
+import org.apache.sqoop.testcategories.sqooptest.UnitTest;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
+@Category(UnitTest.class)
 public class TestMainframeFTPClientUtils {
 
   private JobConf conf;
@@ -297,7 +300,7 @@ public class TestMainframeFTPClientUtils {
 	        FTPFile file2 = new FTPFile();
 	        file2.setName("G0101V00");
 	        file2.setType(FTPFile.FILE_TYPE);
-        when(mockFTPClient.initiateListParsing(MainframeConfiguration.MAINFRAME_FTP_FILE_ENTRY_PARSER_CLASSNAME,"")).thenReturn(mockFTPListParseEngine);
+        when(mockFTPClient.initiateListParsing(MainframeConfiguration.MAINFRAME_FTP_FILE_GDG_ENTRY_PARSER_CLASSNAME,"")).thenReturn(mockFTPListParseEngine);
         when(mockFTPListParseEngine.hasNext()).thenReturn(true,true,false);
         when(mockFTPListParseEngine.getNext(25)).thenReturn(new FTPFile[] {file1,file2});
 	    } catch (IOException e) {

@@ -26,6 +26,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
+
 import org.apache.sqoop.testutil.CommonArgs;
 import org.apache.sqoop.testutil.HsqldbTestServer;
 import org.apache.sqoop.manager.ConnManager;
@@ -48,13 +49,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.sqoop.util.ParquetReader;
 import org.junit.Before;
 import org.junit.Test;
-import org.kitesdk.data.Dataset;
-import org.kitesdk.data.DatasetReader;
-import org.kitesdk.data.Datasets;
 
-import static org.apache.avro.generic.GenericData.Record;
 import static org.junit.Assert.fail;
 
 /**
@@ -206,7 +204,7 @@ public class TestMerge extends BaseSqoopTestCase {
 
     // Now merge the results!
     ClassLoaderStack.addJarFile(jarFileName, MERGE_CLASS_NAME);
-    Path warehouse = new Path(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+    Path warehouse = new Path(getWarehouseDir());
     options = getSqoopOptions(newConf());
     options.setMergeOldPath(new Path(warehouse, OLD_PATH).toString());
     options.setMergeNewPath(new Path(warehouse, NEW_PATH).toString());
@@ -245,7 +243,7 @@ public class TestMerge extends BaseSqoopTestCase {
     options.setFileLayout(fileLayout);
     options.setDeleteMode(true);
 
-    Path warehouse = new Path(BaseSqoopTestCase.LOCAL_WAREHOUSE_DIR);
+    Path warehouse = new Path(getWarehouseDir());
     options.setTargetDir(new Path(warehouse, targetDir).toString());
 
     ImportTool importTool = new ImportTool();
@@ -298,21 +296,11 @@ public class TestMerge extends BaseSqoopTestCase {
     return false;
   }
 
-  private boolean checkParquetFileForLine(FileSystem fileSystem, Path path, List<Integer> record) throws IOException
-  {
-    Dataset<Record> parquetRecords = Datasets.load("dataset:" + path.getParent(), Record.class);
-    DatasetReader<Record> datasetReader = null;
-    try {
-      datasetReader = parquetRecords.newReader();
-      for (GenericRecord genericRecord : datasetReader) {
-        if (valueMatches(genericRecord, record)) {
-          return true;
-        }
-      }
-    }
-    finally {
-      if (datasetReader != null) {
-        datasetReader.close();
+  private boolean checkParquetFileForLine(Path path, List<Integer> record) throws IOException {
+    List<GenericRecord> resultRecords = new ParquetReader(path.getParent()).readAll();
+    for (GenericRecord resultRecord : resultRecords) {
+      if (valueMatches(resultRecord, record)) {
+        return true;
       }
     }
 
@@ -330,7 +318,7 @@ public class TestMerge extends BaseSqoopTestCase {
         result = checkAvroFileForLine(fs, p, record);
         break;
       case ParquetFile:
-        result = checkParquetFileForLine(fs, p, record);
+        result = checkParquetFileForLine(p, record);
         break;
     }
     return result;
@@ -343,7 +331,7 @@ public class TestMerge extends BaseSqoopTestCase {
   protected boolean recordStartsWith(List<Integer> record, String dirName,
       SqoopOptions.FileLayout fileLayout)
       throws Exception {
-    Path warehousePath = new Path(LOCAL_WAREHOUSE_DIR);
+    Path warehousePath = new Path(getWarehouseDir());
     Path targetPath = new Path(warehousePath, dirName);
 
     FileSystem fs = FileSystem.getLocal(new Configuration());
