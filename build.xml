@@ -525,10 +525,14 @@
     <shade jar="build/ivy/lib/sqoop/redist/parquet-avro-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-avro-1.9.0.jar">
       <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
     </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/avro-mapred-1.8.1-hadoop2.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-avro-mapred-1.8.1-hadoop2.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+    </shade>
 
     <move file="${build.dir}/${dest.jar}-shaded.jar" tofile="${build.dir}/${dest.jar}"/>
     <delete file="build/ivy/lib/sqoop/redist/avro-1.8.1.jar"/>
     <delete file="build/ivy/lib/sqoop/redist/parquet-avro-1.9.0.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/avro-mapred-1.8.1-hadoop2.jar"/>
 
     <!-- copy in the build artifact -->
     <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
@@ -624,6 +628,7 @@
         <exclude name="${bin.artifact.name}/bin/*" />
         <exclude name="${bin.artifact.name}/testdata/hive/bin/*" />
         <exclude name="${bin.artifact.name}/**/*.sh" />
+        <exclude name="${bin.artifact.name}/lib/ant-shade-task.jar" />
         <include name="${bin.artifact.name}/**" />
       </tarfileset>
       <tarfileset dir="${build.dir}" mode="755">
