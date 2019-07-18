@@ -269,6 +269,6 @@ under the License.
 
     <exclude org="org.apache.hadoop" module="avro"/>
     <exclude type="pom" />
-
+    <override org="org.apache.commons"  module="commons-compress" rev="1.18"/>
   </dependencies>
 </ivy-module>
