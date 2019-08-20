@@ -518,6 +518,7 @@
 
     <shade jar="${build.dir}/${dest.jar}" uberJar="${build.dir}/${dest.jar}-shaded.jar">
       <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
     </shade>
 
     <shade jar="build/ivy/lib/sqoop/redist/avro-1.8.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-avro-1.8.1.jar">
@@ -525,15 +526,48 @@
     </shade>
     <shade jar="build/ivy/lib/sqoop/redist/parquet-avro-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-avro-1.9.0.jar">
       <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
     </shade>
     <shade jar="build/ivy/lib/sqoop/redist/avro-mapred-1.8.1-hadoop2.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-avro-mapred-1.8.1-hadoop2.jar">
       <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
     </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-hadoop-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-hadoop-1.9.0.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-common-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-common-1.9.0.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-column-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-column-1.9.0.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-format-2.3.1.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-format-2.3.1.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-encoding-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-encoding-1.9.0.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/parquet-jackson-1.9.0.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-parquet-jackson-1.9.0.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+
+
 
     <move file="${build.dir}/${dest.jar}-shaded.jar" tofile="${build.dir}/${dest.jar}"/>
     <delete file="build/ivy/lib/sqoop/redist/avro-1.8.1.jar"/>
     <delete file="build/ivy/lib/sqoop/redist/parquet-avro-1.9.0.jar"/>
     <delete file="build/ivy/lib/sqoop/redist/avro-mapred-1.8.1-hadoop2.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-hadoop-1.9.0.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-common-1.9.0.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-column-1.9.0.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-format-2.3.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-encoding-1.9.0.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/parquet-jackson-1.9.0.jar"/>
 
     <!-- copy in the build artifact -->
     <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
