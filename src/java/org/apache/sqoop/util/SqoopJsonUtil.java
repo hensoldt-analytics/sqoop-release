@@ -23,13 +23,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
-import org.json.JSONObject;
 
 public class SqoopJsonUtil {
 
@@ -43,8 +41,14 @@ public class SqoopJsonUtil {
     if (map == null) {
       map = new HashMap<>();
     }
-    JSONObject pathPartMap = new JSONObject(map);
-    return pathPartMap.toString();
+    ObjectMapper mapper = new ObjectMapper();
+    String jsonString;
+    try {
+      jsonString = mapper.writeValueAsString(map);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Unable to convert object to json string! Input map:" + map, e);
+    }
+    return jsonString;
   }
 
   public static Map<String, String> getMapforJsonString(String mapJsonStr) {
@@ -55,9 +59,7 @@ public class SqoopJsonUtil {
         result = Collections.emptyMap();
       } else {
         ObjectMapper mapper = new ObjectMapper();
-        result = mapper.readValue(mapJsonStr,
-        new TypeReference<HashMap<String, String>>() {
-        });
+        result = mapper.readValue(mapJsonStr, Map.class);
       }
       return result;
     } catch (JsonParseException e) {

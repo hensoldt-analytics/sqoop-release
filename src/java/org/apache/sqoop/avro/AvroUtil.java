@@ -18,6 +18,7 @@
 package org.apache.sqoop.avro;
 
 import org.apache.avro.LogicalType;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.FileReader;
@@ -34,9 +35,16 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.sqoop.config.ConfigurationConstants;
+import org.apache.sqoop.config.ConfigurationHelper;
 import org.apache.sqoop.lib.BlobRef;
 import org.apache.sqoop.lib.ClobRef;
 import org.apache.sqoop.orm.ClassWriter;
+import org.apache.parquet.avro.AvroSchemaConverter;
+import org.apache.parquet.format.converter.ParquetMetadataConverter;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.schema.MessageType;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -282,24 +290,7 @@ public final class AvroUtil {
    */
   public static Schema getAvroSchema(Path path, Configuration conf)
       throws IOException {
-    FileSystem fs = path.getFileSystem(conf);
-    Path fileToTest;
-    if (fs.isDirectory(path)) {
-      FileStatus[] fileStatuses = fs.listStatus(path, new PathFilter() {
-        @Override
-        public boolean accept(Path p) {
-          String name = p.getName();
-          return !name.startsWith("_") && !name.startsWith(".");
-        }
-      });
-      if (fileStatuses.length == 0) {
-        return null;
-      }
-      fileToTest = fileStatuses[0].getPath();
-    } else {
-      fileToTest = path;
-    }
-
+    Path fileToTest = getFileToTest(path, conf);
     SeekableInput input = new FsInput(fileToTest, conf);
     DatumReader<GenericRecord> reader = new GenericDatumReader<GenericRecord>();
     FileReader<GenericRecord> fileReader = DataFileReader.openReader(input, reader);
@@ -307,5 +298,67 @@ public final class AvroUtil {
     Schema result = fileReader.getSchema();
     fileReader.close();
     return result;
+  }
+
+  /**
+   * This method checks if the precision is an invalid value, i.e. smaller than 0 and
+   * if so, tries to overwrite precision and scale with the configured defaults from
+   * the configuration object. If a default precision is not defined, then throws an Exception.
+   *
+   * @param precision precision
+   * @param scale scale
+   * @param conf Configuration that contains the default values if the user specified them
+   * @return an avro decimal type, that can be added as a column type in the avro schema generation
+   */
+  public static LogicalType createDecimalType(Integer precision, Integer scale, Configuration conf) {
+    if (precision == null || precision <= 0) {
+      // we check if the user configured default precision and scale and use these values instead of invalid ones.
+      Integer configuredPrecision = ConfigurationHelper.getIntegerConfigIfExists(conf, ConfigurationConstants.PROP_AVRO_DECIMAL_PRECISION);
+      if (configuredPrecision != null) {
+        precision = configuredPrecision;
+      } else {
+        throw new RuntimeException("Invalid precision for Avro Schema. Please specify a default precision with the -D" +
+            ConfigurationConstants.PROP_AVRO_DECIMAL_PRECISION + " flag to avoid this issue.");
+      }
+      Integer configuredScale = ConfigurationHelper.getIntegerConfigIfExists(conf, ConfigurationConstants.PROP_AVRO_DECIMAL_SCALE);
+      if (configuredScale != null) {
+        scale = configuredScale;
+      }
+    }
+
+    return LogicalTypes.decimal(precision, scale);
+  }
+  private static Path getFileToTest(Path path, Configuration conf) throws IOException {
+    FileSystem fs = path.getFileSystem(conf);
+    if (!fs.isDirectory(path)) {
+      return path;
+    }
+    FileStatus[] fileStatuses = fs.listStatus(path, new PathFilter() {
+      @Override
+      public boolean accept(Path p) {
+        String name = p.getName();
+        return !name.startsWith("_") && !name.startsWith(".");
+      }
+    });
+    if (fileStatuses.length == 0) {
+      return null;
+    }
+    return fileStatuses[0].getPath();
+  }
+
+  public static Schema parseAvroSchema(String schemaString) {
+    return new Schema.Parser().parse(schemaString);
+  }
+
+  public static Schema getAvroSchemaFromParquetFile(Path path, Configuration conf) throws IOException {
+    Path fileToTest = getFileToTest(path, conf);
+    if (fileToTest == null) {
+      return null;
+    }
+    ParquetMetadata parquetMetadata = ParquetFileReader.readFooter(conf, fileToTest, ParquetMetadataConverter.NO_FILTER);
+
+    MessageType parquetSchema = parquetMetadata.getFileMetaData().getSchema();
+    AvroSchemaConverter avroSchemaConverter = new AvroSchemaConverter();
+    return avroSchemaConverter.convert(parquetSchema);
   }
 }

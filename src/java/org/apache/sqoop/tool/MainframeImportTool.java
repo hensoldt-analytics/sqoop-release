@@ -20,9 +20,11 @@ package org.apache.sqoop.tool;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.sqoop.manager.MainframeManager;
 import org.apache.sqoop.mapreduce.mainframe.MainframeConfiguration;
 
 import org.apache.sqoop.SqoopOptions;
@@ -39,6 +41,7 @@ public class MainframeImportTool extends ImportTool {
   public static final String DS_ARG = "dataset";
   public static final String DS_TYPE_ARG = "datasettype";
   public static final String DS_TAPE_ARG = "tape";
+  public static final String BUFFERSIZE_ARG = "buffersize";
 
   public MainframeImportTool() {
     super("import-mainframe", false);
@@ -81,6 +84,14 @@ public class MainframeImportTool extends ImportTool {
         .withDescription("Imports data as plain text (default)")
         .withLongOpt(FMT_TEXTFILE_ARG)
         .create());
+    importOpts.addOption(OptionBuilder
+      .withDescription("Imports data as binary")
+      .withLongOpt(FMT_BINARYFILE_ARG)
+      .create());
+    importOpts.addOption(OptionBuilder
+      .hasArg().withDescription("Sets buffer size for binary import in bytes (default=32kB)")
+      .withLongOpt(BUFFERSIZE_ARG)
+      .create());
     importOpts.addOption(OptionBuilder.withArgName("n")
         .hasArg().withDescription("Use 'n' map tasks to import in parallel")
         .withLongOpt(NUM_MAPPERS_ARG)
@@ -148,7 +159,7 @@ public class MainframeImportTool extends ImportTool {
 
     if (!in.hasOption(CONN_MANAGER_CLASS_NAME)) {
        // set default ConnManager
-      out.setConnManagerClassName("org.apache.sqoop.manager.MainframeManager");
+      out.setConnManagerClassName(MainframeManager.class.getName());
     }
     if (in.hasOption(DS_ARG)) {
       out.setMainframeInputDatasetName(in.getOptionValue(DS_ARG));
@@ -166,6 +177,28 @@ public class MainframeImportTool extends ImportTool {
     } else {
     	// set default tape value to false
     	out.setMainframeInputDatasetTape("false");
+    }
+    if (in.hasOption(FMT_BINARYFILE_ARG)) {
+      out.setMainframeFtpTransferMode(MainframeConfiguration.MAINFRAME_FTP_TRANSFER_MODE_BINARY);
+      out.setFileLayout(SqoopOptions.FileLayout.BinaryFile);
+    } else {
+      // set default transfer mode to ascii
+      out.setMainframeFtpTransferMode(MainframeConfiguration.MAINFRAME_FTP_TRANSFER_MODE_ASCII);
+      out.setFileLayout(SqoopOptions.FileLayout.TextFile);
+    }
+
+    if (in.hasOption(BUFFERSIZE_ARG)) {
+      // if we specify --buffersize set the buffer size
+      int bufSize = Integer.valueOf(in.getOptionValue(BUFFERSIZE_ARG));
+      if (bufSize > 0) {
+        out.setBufferSize(bufSize);
+      }
+      else {
+        out.setBufferSize(MainframeConfiguration.MAINFRAME_FTP_TRANSFER_BINARY_DEFAULT_BUFFER_SIZE);
+      }
+    } else {
+      // set the default buffer size to 32kB
+      out.setBufferSize(MainframeConfiguration.MAINFRAME_FTP_TRANSFER_BINARY_DEFAULT_BUFFER_SIZE);
     }
   }
 
@@ -189,6 +222,17 @@ public class MainframeImportTool extends ImportTool {
 		throw new InvalidOptionsException(
 				"--" + DS_TAPE_ARG + " specified is invalid. " + HELP_STR);
 	}
+    /* only allow FileLayout.BinaryFile to be selected for mainframe import */
+    if (SqoopOptions.FileLayout.BinaryFile.equals(options.getFileLayout()) && StringUtils.isEmpty(options.getMainframeInputDatasetName())) {
+      throw new InvalidOptionsException("--as-binaryfile should only be used with import-mainframe module.");
+    }
+
+    // only allow buffer size to be set different to default when binary file is selected
+    // in any case, if --as-binaryfile isn't selected, --buffersize parameter is harmless
+    if (!SqoopOptions.FileLayout.BinaryFile.equals(options.getFileLayout()) && !MainframeConfiguration.MAINFRAME_FTP_TRANSFER_BINARY_DEFAULT_BUFFER_SIZE.equals(options.getBufferSize())) {
+      throw new InvalidOptionsException("--buffersize should only be used with --as-binaryfile parameter.");
+    }
+
     super.validateImportOptions(options);
   }
 }

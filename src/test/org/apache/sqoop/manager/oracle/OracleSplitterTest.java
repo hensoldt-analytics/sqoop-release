@@ -20,6 +20,7 @@ package org.apache.sqoop.manager.oracle;
 
 import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.manager.oracle.util.OracleUtils;
+import org.apache.sqoop.testcategories.thirdpartytest.OracleTest;
 import org.apache.sqoop.testutil.CommonArgs;
 import org.apache.sqoop.testutil.ImportJobTestCase;
 import org.apache.commons.logging.Log;
@@ -27,6 +28,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,6 +41,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * Test various custom splitters for Oracle.
  */
+@Category(OracleTest.class)
 public class OracleSplitterTest extends ImportJobTestCase {
 
   public static final Log LOG = LogFactory.getLog(
@@ -91,7 +94,7 @@ public class OracleSplitterTest extends ImportJobTestCase {
     args.add("--connect");
     args.add(getConnectString());
     args.add("--target-dir");
-    args.add(getWarehouseDir());
+    args.add(getTablePath().toString());
     args.add("--num-mappers");
     args.add("2");
     args.add("--split-by");
@@ -127,13 +130,13 @@ public class OracleSplitterTest extends ImportJobTestCase {
     List<String> lines;
 
     // First row should be in the first file
-    file = new File(this.getWarehouseDir(), "part-m-00000");
+    file = new File(getTablePath().toString(), "part-m-00000");
     lines = FileUtils.readLines(file, "UTF-8");
     assertEquals(1, lines.size());
     assertEquals("1,old_data,1999-01-01 11:11:11.0", lines.get(0));
 
     // With second line in the second file
-    file = new File(this.getWarehouseDir(), "part-m-00001");
+    file = new File(getTablePath().toString(), "part-m-00001");
     lines = FileUtils.readLines(file, "UTF-8");
     assertEquals(1, lines.size());
     assertEquals("2,new_data,2000-11-11 23:23:23.0", lines.get(0));

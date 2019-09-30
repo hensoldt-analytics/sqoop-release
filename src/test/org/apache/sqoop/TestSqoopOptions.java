@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.sqoop.manager.oracle.OracleUtils;
+import org.apache.sqoop.testcategories.sqooptest.UnitTest;
 import org.junit.After;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.sqoop.tool.ImportAllTablesTool;
@@ -42,6 +43,7 @@ import org.assertj.core.api.SoftAssertions;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
 
 import org.apache.sqoop.SqoopOptions;
@@ -63,6 +65,7 @@ import static org.junit.Assert.fail;
 /**
  * Test aspects of the SqoopOptions class.
  */
+@Category(UnitTest.class)
 public class TestSqoopOptions {
 
   private Properties originalSystemProperties;
@@ -79,7 +82,7 @@ public class TestSqoopOptions {
 
   @Before
   public void setup() {
-    originalSystemProperties = System.getProperties();
+    originalSystemProperties = (Properties)System.getProperties().clone();
     excludedClassesFromClone.add(String.class);
     excludedClassesFromClone.add(Class.class);
     excludedClassesFromClone.add(Integer.class);
@@ -90,6 +93,7 @@ public class TestSqoopOptions {
     excludedFieldsFromClone.add("layout");
     excludedFieldsFromClone.add("activeSqoopTool");
     excludedFieldsFromClone.add("hbaseNullIncrementalMode");
+    excludedFieldsFromClone.add("parquetConfiguratorImplementation");
   }
 
   @After

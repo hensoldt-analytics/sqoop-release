@@ -22,6 +22,7 @@ import org.apache.sqoop.ConnFactory;
 import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.manager.ConnManager;
 import org.apache.sqoop.metastore.JobData;
+import org.apache.sqoop.testcategories.sqooptest.IntegrationTest;
 import org.apache.sqoop.tool.ImportTool;
 import com.google.common.collect.ObjectArrays;
 import org.apache.commons.logging.Log;
@@ -34,6 +35,7 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.sqoop.SqoopJobDataPublisher;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.experimental.categories.Category;
 
 import java.io.File;
 import java.io.IOException;
@@ -41,13 +43,19 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.List;
+import java.util.TimeZone;
 
+import static org.apache.commons.lang3.StringUtils.wrap;
 import static org.junit.Assert.fail;
 
 /**
  * Class that implements common methods required for tests.
  */
+@Category(IntegrationTest.class)
 public abstract class BaseSqoopTestCase {
 
   public static class DummyDataPublisher extends SqoopJobDataPublisher {
@@ -84,22 +92,8 @@ public abstract class BaseSqoopTestCase {
 
   private static boolean onPhysicalCluster = false;
 
-  /** Base directory for all temporary data. */
-  public static final String TEMP_BASE_DIR;
-
-  /** Where to import table data to in the local filesystem for testing. */
-  public static final String LOCAL_WAREHOUSE_DIR;
-
-  // Initializer for the above
-  static {
-    String tmpDir = System.getProperty("test.build.data", "/tmp/");
-    if (!tmpDir.endsWith(File.separator)) {
-      tmpDir = tmpDir + File.separator;
-    }
-
-    TEMP_BASE_DIR = tmpDir;
-    LOCAL_WAREHOUSE_DIR = TEMP_BASE_DIR + "sqoop/warehouse";
-  }
+  public static final String MAP_OUTPUT_FILE_00001 = "part-m-00001";
+  public static final String REDUCE_OUTPUT_FILE_00000 = "part-r-00000";
 
   // Used if a test manually sets the table name to be used.
   private String curTableName;
@@ -132,7 +126,7 @@ public abstract class BaseSqoopTestCase {
   }
 
   protected String getWarehouseDir() {
-    return LOCAL_WAREHOUSE_DIR;
+    return getLocalWarehouseDir();
   }
 
   private String [] colNames;
@@ -217,10 +211,13 @@ public abstract class BaseSqoopTestCase {
   public void setUp() {
     // The assumption is that correct HADOOP configuration will have it set to
     // hdfs://namenode
+    resetDefaultTimeZone();
     setOnPhysicalCluster(
         !CommonArgs.LOCAL_FS.equals(System.getProperty(
             CommonArgs.FS_DEFAULT_NAME)));
     incrementTableNum();
+
+    SqoopOptions.clearNonceDir();
 
     if (!isLog4jConfigured) {
       BasicConfigurator.configure();
@@ -325,6 +322,10 @@ public abstract class BaseSqoopTestCase {
                                                  String[] colTypes,
                                                  String[] vals) {
     createTableWithColTypesAndNames(getTableName(), colNames, colTypes, vals);
+  }
+
+  protected void createTableWithColTypesAndNames(String[] colNames, String[] colTypes, List<Object> record) {
+    createTableWithColTypesAndNames(getTableName(), colNames, colTypes, toStringArray(record));
   }
 
   /**
@@ -432,6 +433,26 @@ public abstract class BaseSqoopTestCase {
 
   protected void insertIntoTable(String[] colTypes, String[] vals) {
     insertIntoTable(null, colTypes, vals);
+  }
+
+  protected void insertIntoTable(String[] colTypes, List<Object> record) {
+    insertIntoTable(null, colTypes, toStringArray(record));
+  }
+
+  protected void insertRecordsIntoTable(String[] colTypes, List<List<Object>> records) {
+    for (List<Object> record : records) {
+      insertIntoTable(colTypes, record);
+    }
+  }
+
+  protected void insertRecordsIntoTableWithColTypesAndNames(String[] columns, String[] colTypes, List<List<Object>> records) {
+    for (List<Object> record : records) {
+      insertIntoTable(columns, colTypes, record);
+    }
+  }
+
+  protected void insertIntoTable(String[] columns, String[] colTypes, List<Object> record) {
+    insertIntoTable(columns, colTypes, toStringArray(record));
   }
 
   protected void insertIntoTable(String[] columns, String[] colTypes, String[] vals) {
@@ -582,6 +603,24 @@ public abstract class BaseSqoopTestCase {
     createTableWithColTypesAndNames(colNames, colTypes, vals);
   }
 
+  protected void createTableWithColTypes(String [] colTypes, List<Object> record) {
+    createTableWithColTypes(colTypes, toStringArray(record));
+  }
+
+  protected void createTableWithRecords(String [] colTypes, List<List<Object>> records) {
+    createTableWithColTypes(colTypes, records.get(0));
+    for (int i = 1; i < records.size(); i++) {
+      insertIntoTable(colTypes, records.get(i));
+    }
+  }
+
+  protected void createTableWithRecordsWithColTypesAndNames(String [] columns, String [] colTypes, List<List<Object>> records) {
+    createTableWithColTypesAndNames(columns, colTypes, records.get(0));
+    for (int i = 1; i < records.size(); i++) {
+      insertIntoTable(columns, colTypes, records.get(i));
+    }
+  }
+
   /**
    * Create a table with a single column and put a data element in it.
    * @param colType the type of the column to create
@@ -633,5 +672,59 @@ public abstract class BaseSqoopTestCase {
     }
 
     return ObjectArrays.concat(entries, moreEntries, String.class);
+  }
+
+  protected void clearTable(String tableName) throws SQLException {
+    String truncateCommand = "DELETE FROM " + tableName;
+    Connection conn = getManager().getConnection();
+    try (PreparedStatement statement = conn.prepareStatement(truncateCommand)){
+      statement.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private String[] toStringArray(List<Object> columnValues) {
+    String[] result = new String[columnValues.size()];
+
+    for (int i = 0; i < columnValues.size(); i++) {
+      if (columnValues.get(i) instanceof String) {
+        result[i] = wrap((String) columnValues.get(i), '\'');
+      } else {
+        result[i] = columnValues.get(i).toString();
+      }
+    }
+
+    return result;
+  }
+
+  public static long timeFromString(String timeStampString) {
+    try {
+      SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+      return format.parse(timeStampString).getTime();
+    } catch (ParseException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected void resetDefaultTimeZone() {
+    String timeZoneId = System.getProperty("user.timezone");
+    TimeZone defaultTimeZone = TimeZone.getTimeZone(timeZoneId);
+    TimeZone.setDefault(defaultTimeZone);
+  }
+
+  /** Base directory for all temporary data. */
+  public static String getTempBaseDir() {
+    String tmpDir = System.getProperty("test.build.data", "/tmp/");
+    if (!tmpDir.endsWith(File.separator)) {
+      tmpDir = tmpDir + File.separator;
+    }
+
+    return tmpDir;
+  }
+
+  /** Where to import table data to in the local filesystem for testing. */
+  public static String getLocalWarehouseDir() {
+    return getTempBaseDir() + "sqoop/warehouse";
   }
 }

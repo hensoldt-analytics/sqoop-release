@@ -46,7 +46,6 @@ import org.apache.sqoop.util.ImportException;
  */
 public class MainframeManager extends org.apache.sqoop.manager.ConnManager {
   public static final String DEFAULT_DATASET_COLUMN_NAME = "DEFAULT_COLUMN";
-  protected SqoopOptions options;
   private static final Log LOG
       = LogFactory.getLog(MainframeManager.class.getName());
 
@@ -90,7 +89,7 @@ public class MainframeManager extends org.apache.sqoop.manager.ConnManager {
       importer = new AccumuloImportJob(opts, context);
     } else {
       // Import to HDFS.
-      importer = new MainframeImportJob(opts, context);
+      importer = new MainframeImportJob(opts, context, getParquetJobConfigurator().createParquetImportJobConfigurator());
     }
 
     importer.setInputFormatClass(MainframeDatasetInputFormat.class);

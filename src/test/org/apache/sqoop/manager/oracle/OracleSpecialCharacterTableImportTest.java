@@ -20,6 +20,7 @@ package org.apache.sqoop.manager.oracle;
 
 import org.apache.sqoop.SqoopOptions;
 import org.apache.sqoop.manager.oracle.util.OracleUtils;
+import org.apache.sqoop.testcategories.thirdpartytest.OracleTest;
 import org.apache.sqoop.testutil.CommonArgs;
 import org.apache.sqoop.testutil.ImportJobTestCase;
 import com.google.common.base.Charsets;
@@ -28,8 +29,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sqoop.util.BlockJUnit4ClassRunnerWithParametersFactory;
 import org.junit.After;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -42,6 +45,8 @@ import java.util.Arrays;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(Parameterized.class)
+@Category(OracleTest.class)
+@Parameterized.UseParametersRunnerFactory(BlockJUnit4ClassRunnerWithParametersFactory.class)
 public class OracleSpecialCharacterTableImportTest extends ImportJobTestCase {
 
   @Parameterized.Parameters(name = "tableName = {0}")
@@ -98,7 +103,7 @@ public class OracleSpecialCharacterTableImportTest extends ImportJobTestCase {
     args.add("--password");
     args.add(OracleUtils.ORACLE_USER_PASS);
     args.add("--target-dir");
-    args.add(getWarehouseDir());
+    args.add(getTablePath().toString());
     args.add("--num-mappers");
     args.add("1");
     args.add("--table");
@@ -120,8 +125,7 @@ public class OracleSpecialCharacterTableImportTest extends ImportJobTestCase {
     String[] args = getArgv();
     runImport(args);
 
-    Path warehousePath = new Path(this.getWarehouseDir());
-    Path filePath = new Path(warehousePath, "part-m-00000");
+    Path filePath = new Path(getTablePath(), "part-m-00000");
     String output = Files.toString(new File(filePath.toString()), Charsets.UTF_8);
 
     assertEquals("hello, world!", output.trim());

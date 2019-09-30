@@ -48,6 +48,8 @@ import org.apache.sqoop.validation.ValidationException;
 import java.io.IOException;
 import java.sql.SQLException;
 
+import static org.apache.sqoop.mapreduce.parquet.ParquetConstants.SQOOP_PARQUET_OUTPUT_CODEC_KEY;
+
 /**
  * Base class for running an import MapReduce job.
  * Allows dependency injection, etc, for easy customization of import job types.
@@ -146,7 +148,8 @@ public class ImportJobBase extends JobBase {
           Configuration conf = job.getConfiguration();
           String shortName = CodecMap.getCodecShortNameByName(codecName, conf);
           if (!shortName.equalsIgnoreCase("default")) {
-            conf.set(ParquetJob.CONF_OUTPUT_CODEC, shortName);
+            conf.set(SQOOP_PARQUET_OUTPUT_CODEC_KEY, shortName);
+            options.getConf().set(SQOOP_PARQUET_OUTPUT_CODEC_KEY, shortName);
           }
         }
       }
