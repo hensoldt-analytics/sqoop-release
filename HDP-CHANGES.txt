@@ -1,3 +1,10 @@
+-- Backport and Internal patches since HDP-3.1.4.0-78 --
+
+BUG-122423 Remove HBase (non-)shaded client from Sqoop class path
+BUG-121841 SQOOP-3447: Remove usage of org.codehaus.jackson and org.json packages
+
+-- Previous changes --
+
  INCOMPATIBLE CHANGES
   None
 
