@@ -172,7 +172,7 @@ fi
 
 # Add HBase to dependency list
 if [ -e "$HBASE_HOME/bin/hbase" ]; then
-  TMP_SQOOP_CLASSPATH=${SQOOP_CLASSPATH}:`$HBASE_HOME/bin/hbase classpath`
+  TMP_SQOOP_CLASSPATH=${SQOOP_CLASSPATH}:`$HBASE_HOME/bin/hbase classpath | sed -E --expression='s|/usr/hdp/(3.1.5.{5,10}|current)/hbase/lib/shaded-clients/.+jar:||g'`
   SQOOP_CLASSPATH=${TMP_SQOOP_CLASSPATH}
 fi
 
