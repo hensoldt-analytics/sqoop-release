@@ -211,6 +211,9 @@ fi
 
 add_to_classpath ${SQOOP_JAR_DIR}
 
+SQOOP_TRUNCATED_CLASSPATH=`echo ${SQOOP_CLASSPATH} | sed --expression='s/:/\n/g' | grep -v "shaded-clients" | tr '\n' ':'`
+SQOOP_CLASSPATH=${SQOOP_TRUNCATED_CLASSPATH}
+
 HADOOP_CLASSPATH="${SQOOP_CLASSPATH}:${HADOOP_CLASSPATH}"
 if [ ! -z "$SQOOP_USER_CLASSPATH" ]; then
   # User has elements to prepend to the classpath, forcibly overriding
