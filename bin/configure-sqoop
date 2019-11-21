@@ -172,7 +172,7 @@ fi
 
 # Add HBase to dependency list
 if [ -e "$HBASE_HOME/bin/hbase" ]; then
-  TMP_SQOOP_CLASSPATH=${SQOOP_CLASSPATH}:`$HBASE_HOME/bin/hbase classpath`
+  TMP_SQOOP_CLASSPATH=${SQOOP_CLASSPATH}:`$HBASE_HOME/bin/hbase mapredcp`
   SQOOP_CLASSPATH=${TMP_SQOOP_CLASSPATH}
 fi
 
@@ -210,9 +210,6 @@ if [ -d "$SQOOP_HOME/build/ivy/lib/sqoop" ]; then
 fi
 
 add_to_classpath ${SQOOP_JAR_DIR}
-
-SQOOP_TRUNCATED_CLASSPATH=`echo ${SQOOP_CLASSPATH} | sed --expression='s/:/\n/g' | grep -v "shaded-clients" | tr '\n' ':'`
-SQOOP_CLASSPATH=${SQOOP_TRUNCATED_CLASSPATH}
 
 HADOOP_CLASSPATH="${SQOOP_CLASSPATH}:${HADOOP_CLASSPATH}"
 if [ ! -z "$SQOOP_USER_CLASSPATH" ]; then
