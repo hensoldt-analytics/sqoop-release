@@ -80,3 +80,4 @@
    SQOOP-2283: Support usage of --exec and --password-alias
    SQOOP-2286: Ensure Sqoop generates valid avro column names
 
+HOTFIX-2860 RELENG-8014 sqoop requires https to repo1.maven.org
