@@ -83,3 +83,4 @@
     BUG-107778 SQOOP-3139: sqoop tries to re execute select query during import
     in case of a connection reset error and this is causing lots of duplicate
     records from source
+HOTFIX-3015 RELENG-8014 sqoop requires https to repo1.maven.org
