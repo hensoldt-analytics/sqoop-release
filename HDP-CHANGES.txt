@@ -87,3 +87,4 @@ BUG-121841 SQOOP-3447: Remove usage of org.codehaus.jackson and org.json package
    SQOOP-2283: Support usage of --exec and --password-alias
    SQOOP-2286: Ensure Sqoop generates valid avro column names
 
+HOTFIX-3501 RELENG-8014 sqoop requires https to repo1.maven.org
