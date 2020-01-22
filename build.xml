@@ -534,7 +534,14 @@
       <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
       <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
     </shade>
-
+    <shade jar="build/ivy/lib/sqoop/redist/kite-data-hive-${kite-data.version}.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-kite-data-hive-${kite-data.version}.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
+    <shade jar="build/ivy/lib/sqoop/redist/kite-data-mapreduce-${kite-data.version}.jar" uberJar="build/ivy/lib/sqoop/redist/sqoop-kite-data-mapreduce-${kite-data.version}.jar">
+      <relocation pattern="org.apache.avro" shadedPattern="sqoop.org.apache.avro"></relocation>
+      <relocation pattern="org.apache.parquet" shadedPattern="sqoop.org.apache.parquet"></relocation>
+    </shade>
 
 
     <move file="${build.dir}/${dest.jar}-shaded.jar" tofile="${build.dir}/${dest.jar}"/>
@@ -547,6 +554,8 @@
     <delete file="build/ivy/lib/sqoop/redist/parquet-format-2.3.0-incubating.jar"/>
     <delete file="build/ivy/lib/sqoop/redist/parquet-encoding-1.8.1.jar"/>
     <delete file="build/ivy/lib/sqoop/redist/parquet-jackson-1.8.1.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/kite-data-hive-${kite-data.version}.jar"/>
+    <delete file="build/ivy/lib/sqoop/redist/kite-data-mapreduce-${kite-data.version}.jar"/>
 
     <!-- copy in the build artifact -->
     <copy todir="${dist.dir}" includeEmptyDirs="false" flatten="true">
