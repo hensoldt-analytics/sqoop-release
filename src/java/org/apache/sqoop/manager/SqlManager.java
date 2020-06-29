@@ -20,6 +20,7 @@ package org.apache.sqoop.manager;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -689,7 +690,21 @@ public abstract class SqlManager
     checkTableImportOptions(context);
 
     String splitCol = getSplitColumn(opts, tableName);
+
+    closeConnection(context);
+
     importer.runImport(tableName, jarFile, splitCol, opts.getConf());
+  }
+
+  private void closeConnection(ImportJobContext context) {
+    try {
+      context.getConnManager().close();
+    } catch (SQLException e) {
+      LOG.warn("Could not close database connection: " + e.toString());
+      StringWriter sw = new StringWriter();
+      e.printStackTrace(new PrintWriter(sw));
+      LOG.debug(sw.toString());
+    }
   }
 
   /**
