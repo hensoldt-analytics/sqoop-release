@@ -86,7 +86,12 @@ public class OrcUtil {
       }
     }
 
-    options.getConf().set(OrcConf.MAPRED_OUTPUT_SCHEMA.getAttribute(),
-        createOrcSchemaString(manager, options.getTableName(), columns, options.getMapColumnHive()));
+    if (options.doHiveImport()) {
+      options.getConf().set(OrcConf.MAPRED_OUTPUT_SCHEMA.getAttribute(),
+              createOrcSchemaString(manager, options.getTableName(), columns, options.getMapColumnHive()));
+    } else {
+      options.getConf().set(OrcConf.MAPRED_OUTPUT_SCHEMA.getAttribute(),
+              createOrcSchemaString(manager, options.getTableName(), columns, options.getMapColumnJava()));
+    }
   }
 }
