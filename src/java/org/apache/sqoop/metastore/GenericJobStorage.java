@@ -438,6 +438,12 @@ public class GenericJobStorage extends JobStorage {
         String key = entry.getKey();
         String rawVal = saveConf.getRaw(key);
         String baseVal = baseConf.getRaw(key);
+
+        if (rawVal == null) {
+          LOG.debug(String.format("Not saving %s as its value is null.", key));
+          continue;
+        }
+
         if (baseVal != null && rawVal.equals(baseVal)) {
           continue; // Don't save this; it's set in the base configuration.
         }
